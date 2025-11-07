@@ -1,0 +1,17 @@
+{
+  "expo": {
+    "sdkVersion": "54.0.0",
+    "plugins": [
+      "expo-router",
+      "expo-notifications"
+    ],
+    "experiments": {
+      "turboModules": false,
+      "tsconfigPaths": true,
+      "typedRoutes": true
+    },
+    "android": {
+      "package": "com.anonymous.expensetracker"
+    }
+  }
+}
