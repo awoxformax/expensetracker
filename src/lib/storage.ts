@@ -101,3 +101,13 @@ export async function jremove(key: string) {
     console.warn("Failed to remove local data", err);
   }
 }
+export async function setItem(key: string, value: any) {
+  await AsyncStorage.setItem(key, JSON.stringify(value));
+}
+export async function getItem<T = any>(key: string, fallback: T): Promise<T> {
+  const v = await AsyncStorage.getItem(key);
+  return v ? JSON.parse(v) as T : fallback;
+}
+export async function removeItem(key: string) {
+  await AsyncStorage.removeItem(key);
+}

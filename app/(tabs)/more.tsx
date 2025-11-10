@@ -1,27 +1,35 @@
 import React, { useState } from "react";
 import {
-  SafeAreaView,
   ScrollView,
   View,
   Text,
   Image,
   TouchableOpacity,
   StyleSheet,
+  Linking,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import { useTheme } from "../../src/theme/ThemeProvider";
 
 export default function MoreScreen() {
+  const router = useRouter();
   const { colors } = useTheme();
-  const [progress] = useState(0.6);
+
+  // Linkləri açmaq funksiyası
+  const openLink = async (url: string) => {
+    const supported = await Linking.canOpenURL(url);
+    if (supported) await Linking.openURL(url);
+  };
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: "#F4F6F9" }]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 80 }}
+        contentContainerStyle={{ paddingBottom: 60 }}
       >
-        {/* Profil başlığı */}
+        {/* Başlıq */}
         <Text style={[styles.header, { color: colors.text }]}>Profil</Text>
 
         {/* Profil məlumatları */}
@@ -40,93 +48,104 @@ export default function MoreScreen() {
           </View>
         </View>
 
-        {/* Logo tam çərçivəni tutur */}
-<View style={styles.logoFullWrapper}>
-  <Image
-    source={require("../../src/assets/images/logo.png")}
-    style={styles.fullLogo}
-  />
-</View>
-
-
-
-        {/* Profilini tamamla */}
-        <TouchableOpacity style={styles.completeCard} activeOpacity={0.9}>
-          <View style={styles.progressCircle}>
-            <Text style={styles.progressText}>
-              {Math.round(progress * 100)}%
-            </Text>
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.completeTitle}>Profilini tamamla</Text>
-            <Text style={styles.completeSub}>
-              Gəl, profilini tam hazır edək!
-            </Text>
-          </View>
-          <Ionicons
-            name="chevron-forward-outline"
-            size={20}
-            color="#64748B"
-            style={{ marginLeft: 4 }}
+        {/* Logo */}
+        <View style={styles.logoFullWrapper}>
+          <Image
+            source={require("../../src/assets/images/logo.png")}
+            style={styles.fullLogo}
           />
-        </TouchableOpacity>
+        </View>
 
         {/* Grid menyular */}
         <View style={styles.gridContainer}>
           <MenuBox
             icon="person-outline"
             label="Məlumatlarım"
-            sub="Ad, nömrə, FİN, CINS"
+            sub="Ad, Nömrə"
+            onPress={() => router.push("/settings/info")}
           />
           <MenuBox
             icon="settings-outline"
             label="Tənzimləmələr"
-            sub="PIN-i dəyişmək, biometrika"
+            sub="PIN və biometrika"
+            onPress={() => router.push("/settings/settings")}
           />
           <MenuBox
             icon="document-text-outline"
             label="Sənədlər"
-            sub="Daha ətraflı"
+            sub="Boşdur"
           />
           <MenuBox
             icon="language-outline"
             label="Dil"
             sub="Azərbaycan"
             flag="🇦🇿"
+            onPress={() => router.push("/settings/language")}
           />
         </View>
 
-        {/* Kartlarım */}
-        <View style={styles.cardsSection}>
-          <Text style={styles.sectionTitle}>Kartlarım</Text>
-          <View style={styles.cardsRow}>
-            <View style={[styles.cardDesign, { backgroundColor: "#10B981" }]} />
-            <View style={[styles.cardDesign, { backgroundColor: "#3B82F6" }]} />
-            <View style={[styles.cardDesign, { backgroundColor: "#F59E0B" }]} />
+        {/* Dəstək bölməsi */}
+        <View style={styles.supportSection}>
+          <Text style={styles.sectionTitle}>Dəstək</Text>
+
+          {/* WhatsApp */}
+          <TouchableOpacity
+            style={styles.supportCard}
+            activeOpacity={0.9}
+            onPress={() => openLink("https://wa.me/994102284679")}
+          >
+            <Ionicons name="logo-whatsapp" size={24} color="#25D366" />
+            <View style={{ flex: 1, marginLeft: 10 }}>
+              <Text style={styles.supportTitle}>WhatsApp</Text>
+              <Text style={styles.supportSub}>
+                +994 10 228 46 79 ilə əlaqə
+              </Text>
+            </View>
+          </TouchableOpacity>
+
+          {/* Instagram */}
+          <TouchableOpacity
+            style={styles.supportCard}
+            activeOpacity={0.9}
+            onPress={() => openLink("https://instagram.com/onlymamed")}
+          >
+            <Ionicons name="logo-instagram" size={24} color="#C13584" />
+            <View style={{ flex: 1, marginLeft: 10 }}>
+              <Text style={styles.supportTitle}>Instagram</Text>
+              <Text style={styles.supportSub}>@onlymamed səhifəsi</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
+
+        {/* Biz hər yerdəyik */}
+        <View style={styles.socialsSection}>
+          <Text style={styles.socialTitle}>Biz hər yerdəyik</Text>
+          <View style={styles.socialRow}>
+            <TouchableOpacity onPress={() => openLink("https://instagram.com/onlymamed")}>
+              <Ionicons name="logo-instagram" size={28} color="#C13584" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => openLink("https://wa.me/994102284679")}
+            >
+              <Ionicons name="logo-whatsapp" size={28} color="#25D366" />
+            </TouchableOpacity>
           </View>
         </View>
 
-        {/* Dəstək */}
-        <TouchableOpacity style={styles.supportCard} activeOpacity={0.9}>
-          <Ionicons name="chatbubbles-outline" size={22} color="#2563EB" />
-          <View style={{ flex: 1, marginLeft: 10 }}>
-            <Text style={styles.supportTitle}>Dəstək</Text>
-            <Text style={styles.supportSub}>Əlaqə, Tez-tez verilən suallar</Text>
-          </View>
-          <Ionicons name="chevron-forward-outline" size={20} color="#64748B" />
-        </TouchableOpacity>
+        {/* Versiya */}
+        <Text style={styles.version}>ExpenseTracker version 1.0.0</Text>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-function MenuBox({ icon, label, sub, flag }: any) {
+function MenuBox({ icon, label, sub, flag, onPress }: any) {
   return (
-    <TouchableOpacity style={styles.menuBox} activeOpacity={0.9}>
+    <TouchableOpacity style={styles.menuBox} activeOpacity={0.9} onPress={onPress}>
       <Ionicons name={icon} size={22} color="#2563EB" />
       <View style={{ marginLeft: 8, flex: 1 }}>
         <Text style={styles.menuLabel}>{label}</Text>
-        {sub && <Text style={styles.menuSub}>{sub}</Text>}
+        {!!sub && <Text style={styles.menuSub}>{sub}</Text>}
       </View>
       {flag && <Text style={styles.flag}>{flag}</Text>}
     </TouchableOpacity>
@@ -134,11 +153,11 @@ function MenuBox({ icon, label, sub, flag }: any) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#F9FAFB" },
+  safe: { flex: 1 },
   header: {
     fontSize: 30,
     fontWeight: "800",
-    marginTop: 8,
+    marginTop: 18,
     marginHorizontal: 20,
   },
   profileRow: {
@@ -149,107 +168,88 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     gap: 14,
   },
-  avatar: {
-    width: 58,
-    height: 58,
-    borderRadius: 30,
-  },
+  avatar: { width: 58, height: 58, borderRadius: 30 },
   name: { fontSize: 17, fontWeight: "600" },
   phone: { fontSize: 13 },
 
-  // 🔹 LOGO tam çərçivəni tutur
-logoFullWrapper: {
-  marginHorizontal: 20,
-  borderRadius: 22,
-  overflow: "hidden",
-  height: 180,
-  marginTop: 10,
-  elevation: 3,
-  alignItems: "center",
-  justifyContent: "center",
-},
-fullLogo: {
-  width: "100%",
-  height: "115%", // yazını bir az aşağı gətirir
-  resizeMode: "cover",
-  transform: [{ translateY: 10 }], // 10px aşağı çəkir
-},
-
-  completeCard: {
+  logoFullWrapper: {
     marginHorizontal: 20,
-    borderRadius: 20,
-    backgroundColor: "#fff",
-    padding: 16,
-    marginTop: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    elevation: 3,
+    borderRadius: 22,
+    overflow: "hidden",
+    height: 180,
+    marginTop: 10,
+    elevation: 2,
+    backgroundColor: "#FFF",
+    borderWidth: 1,
+    borderColor: "#E9EEF5",
   },
-  progressCircle: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    borderWidth: 5,
-    borderColor: "#3B82F6",
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 12,
-  },
-  progressText: { fontWeight: "700", color: "#1E293B" },
-  completeTitle: { fontWeight: "700", fontSize: 15, color: "#1E293B" },
-  completeSub: { color: "#64748B", fontSize: 13, marginTop: 3 },
+  fullLogo: { width: "100%", height: "100%", resizeMode: "cover" },
 
   gridContainer: {
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
     paddingHorizontal: 20,
-    marginTop: 16,
+    marginTop: 12,
   },
   menuBox: {
     width: "48%",
-    backgroundColor: "#fff",
-    borderRadius: 22,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 18,
     padding: 14,
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 14,
-    elevation: 2,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#E9EEF5",
   },
-  menuLabel: { fontWeight: "600", fontSize: 14, color: "#1E293B" },
-  menuSub: { fontSize: 11, color: "#64748B" },
+  menuLabel: { fontWeight: "700", fontSize: 14, color: "#0F172A" },
+  menuSub: { fontSize: 12, color: "#6B7280", marginTop: 2 },
   flag: { fontSize: 16 },
 
-  cardsSection: {
+  supportSection: {
     marginHorizontal: 20,
     marginTop: 10,
   },
   sectionTitle: {
     fontWeight: "700",
     fontSize: 15,
-    color: "#1E293B",
+    color: "#0F172A",
     marginBottom: 10,
   },
-  cardsRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  cardDesign: {
-    width: 100,
-    height: 60,
-    borderRadius: 12,
-  },
-
   supportCard: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#fff",
-    borderRadius: 22,
-    padding: 16,
-    marginHorizontal: 20,
-    marginTop: 16,
-    elevation: 2,
+    borderRadius: 18,
+    padding: 14,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: "#E9EEF5",
   },
-  supportTitle: { fontWeight: "700", color: "#1E293B" },
-  supportSub: { color: "#64748B", fontSize: 12, marginTop: 2 },
+  supportTitle: { fontWeight: "700", color: "#0F172A" },
+  supportSub: { color: "#6B7280", fontSize: 12, marginTop: 2 },
+
+  socialsSection: {
+    marginTop: 20,
+    alignItems: "center",
+  },
+  socialTitle: {
+    fontWeight: "700",
+    color: "#0F172A",
+    marginBottom: 8,
+    fontSize: 15,
+  },
+  socialRow: {
+    flexDirection: "row",
+    gap: 20,
+    marginBottom: 10,
+  },
+
+  version: {
+    textAlign: "center",
+    color: "#9CA3AF",
+    marginTop: 10,
+    marginBottom: 20,
+  },
 });

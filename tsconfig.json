@@ -18,21 +18,31 @@
     "types": [
       "react",
       "expo-router"
-    ]
+    ],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": [
+        "*"
+      ],
+      "@/src/*": [
+        "src/*"
+      ],
+      "@/src/lib/*": [
+        "src/lib/*"
+      ]
+    }
   },
   "include": [
-    "src/**/*.ts",
-    "src/**/*.tsx",
-    "app/**/*.ts",
-    "app/**/*.tsx",
+    "src",
+    "app",
     "App.tsx",
-    ".expo/types/**/*.ts",
-    "expo-env.d.ts"
+    ".expo/types",
+    "expo-env.d.ts",
+    ".expo/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",
-    "server/**",
-    "App/**"
+    "server"
   ],
   "extends": "expo/tsconfig.base"
 }
