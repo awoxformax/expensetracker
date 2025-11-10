@@ -30,7 +30,10 @@ export async function scheduleLocal(
       body,
       data: { type },
     },
-    trigger: triggerDate,
+    trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.DATE,
+      date: triggerDate,
+    },
   });
 
   return notificationId;

@@ -1,29 +1,21 @@
-import React, {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from 'react';
-import { Alert, Platform, ToastAndroid } from 'react-native';
-import { API_BASE_URL } from '../lib/config';
-import { useAuth } from './AuthContext';
+﻿import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { Alert, Platform, ToastAndroid } from "react-native";
+import { API_BASE_URL } from "../lib/config";
+import { useAuth } from "./AuthContext";
+import { jget, jset } from "../lib/storage";
+import { scheduleAt } from "../screens/main/notifications";
+import { DEFAULT_CATEGORIES } from "../constants/categories";
 
-export type TransactionRepeatRule = {
-  freq: 'daily' | 'weekly' | 'monthly';
-  dayOfMonth?: number;
-  weekday?: number;
-};
+export type TransactionRepeatRule = { freq: "daily" | "weekly" | "monthly"; dayOfMonth?: number; weekday?: number; };
 
 export type Transaction = {
   _id: string;
   userId: string;
-  type: 'income' | 'expense';
+  type: "income" | "expense";
   category: string;
   amount: number;
   note?: string;
-  date: string;
+  date: string;              // ISO
   isRecurring: boolean;
   repeatRule?: TransactionRepeatRule;
   notify: boolean;
@@ -33,7 +25,7 @@ export type Transaction = {
 };
 
 export type CreateTransactionPayload = {
-  type: 'income' | 'expense';
+  type: "income" | "expense";
   category: string;
   amount: number;
   note?: string;
@@ -44,305 +36,305 @@ export type CreateTransactionPayload = {
   nextTriggerAt?: string;
 };
 
-export type UpdateTransactionPatch = Partial<
-  Pick<Transaction, 'amount' | 'category' | 'note'>
->;
+export type UpdateTransactionPatch = Partial<Pick<Transaction, "amount" | "category" | "note">>;
 
-export type CategoryLimit = {
-  _id: string;
-  userId: string;
-  category: string;
-  monthlyLimit: number;
+export type Category = {
+  id: string;
+  name: string;
+  type: "income" | "expense";
+  limit?: number;
+  spent?: number; // yalnız expense üçündür
+  builtIn?: boolean;
+  icon?: string;
+  color?: string;
 };
 
-type ApiResponse<T> = {
-  ok: boolean;
-  data?: T;
-  error?: string;
+export type Reminder = {
+  id: string;
+  title: string;
+  kind: "income" | "expense";
+  action: "open_income_form" | "navigate_category";
+  category?: string; // expense Ã¼Ã§Ã¼n
+  incomeSubtype?: "salary" | "stipend" | "other";
+  startDate: string; // ISO
+  endDate?: string;  // ISO
+  atHour?: number;   // 9 => 09:00
 };
+
+type ApiResponse<T> = { ok: boolean; data?: T; error?: string; };
 
 type TransactionsContextValue = {
   transactions: Transaction[];
+  categories: Category[];
+  reminders: Reminder[];
+
   loading: boolean;
   error: string | null;
   currentMonth: string | null;
-  limits: CategoryLimit[];
+
+  // server
   loadTransactions: (month: string) => Promise<void>;
-  refreshLimits: () => Promise<void>;
   createTransaction: (payload: CreateTransactionPayload) => Promise<boolean>;
   updateTransaction: (id: string, patch: UpdateTransactionPatch) => Promise<boolean>;
   deleteTransaction: (id: string) => Promise<boolean>;
+
+  // categories (local + server-sync gÉ™lÉ™cÉ™kdÉ™)
+  addCategory: (name: string, type: "income" | "expense", limit?: number) => Promise<void>;
+  removeCategory: (id: string) => Promise<void>;
+  refreshLocalDerived: () => void;
+
+  // reminders
+  addReminder: (r: Reminder) => Promise<void>;
+  removeReminder: (id: string) => Promise<void>;
 };
 
-const TransactionsContext = createContext<TransactionsContextValue>({
-  transactions: [],
-  loading: false,
-  error: null,
-  currentMonth: null,
-  limits: [],
-  loadTransactions: async () => {},
-  refreshLimits: async () => {},
-  createTransaction: async () => false,
-  updateTransaction: async () => false,
-  deleteTransaction: async () => false,
-});
+const TransactionsContext = createContext<TransactionsContextValue>({} as any);
 
-const formatMonthKey = (value: string) => {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  const year = date.getUTCFullYear();
-  const month = `${date.getUTCMonth() + 1}`.padStart(2, '0');
-  return `${year}-${month}`;
-};
+const CKEY = "categories:v1";
+const RKEY = "reminders:v1";
+const TKEY = "transactions_cache:v1";
 
 export const TransactionsProvider = ({ children }: { children: React.ReactNode }) => {
   const { token } = useAuth();
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [currentMonth, setCurrentMonth] = useState<string | null>(null);
-  const [limits, setLimits] = useState<CategoryLimit[]>([]);
 
-  const showLimitNotification = useCallback((msg: string) => {
-    if (Platform.OS === 'android') {
-      ToastAndroid.show(msg, ToastAndroid.LONG);
-    } else {
-      Alert.alert('Limit xəbərdarlığı', msg);
-    }
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [customCategories, setCustomCategories] = useState<Category[]>([]);
+  const [reminders, setReminders]     = useState<Reminder[]>([]);
+
+  const categories = useMemo(
+    () => composeCategories(customCategories, transactions),
+    [customCategories, transactions]
+  );
+
+  const [loading, setLoading]         = useState(false);
+  const [error, setError]             = useState<string | null>(null);
+  const [currentMonth, setCurrentMonth] = useState<string | null>(null);
+
+  // ===== Boot from storage
+  useEffect(() => {
+    (async () => {
+      const [cats, rms, cache] = await Promise.all([
+        jget<Category[]>(CKEY, []),
+        jget<Reminder[]>(RKEY, []),
+        jget<Transaction[]>(TKEY, []),
+      ]);
+      setCustomCategories(normalizeCustomCategories(cats));
+      setReminders(rms);
+      setTransactions(cache);
+    })();
   }, []);
+
+  // ===== Helpers
+  const showToast = (msg: string) => {
+    if (Platform.OS === "android") ToastAndroid.show(msg, ToastAndroid.SHORT);
+    else Alert.alert("BildiriÅŸ", msg);
+  };
 
   const authedRequest = useCallback(
     async <T,>(path: string, options: RequestInit = {}) => {
-      if (!token) {
-        throw new Error('Sessiya tapılmadı. Yenidən giriş edin.');
-      }
-      try {
-        const res = await fetch(`${API_BASE_URL}${path}`, {
-          ...options,
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-            ...(options.headers || {}),
-          },
-        });
-        const data = (await res.json()) as ApiResponse<T>;
-        return data;
-      } catch (err) {
-        throw new Error('Şəbəkə xətası baş verdi');
-      }
-    },
-    [token]
+      if (!token) throw new Error("Sessiya yoxdur");
+      const res = await fetch(`${API_BASE_URL}${path}`, {
+        ...options,
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}`, ...(options.headers || {}) },
+      });
+      const data = (await res.json()) as ApiResponse<T>;
+      return data;
+    }, [token]
   );
 
-  const refreshLimits = useCallback(async () => {
-    if (!token) return;
+  // ===== Server ops
+      const loadTransactions = useCallback(async (month: string) => {
+    if (!month) return;
+    setLoading(true); setError(null);
     try {
-      const result = await authedRequest<CategoryLimit[]>('/api/settings/limits', { method: 'GET' });
-      if (result.ok && result.data) {
-        setLimits(result.data);
-      }
-    } catch (err) {
-      console.warn('Limits fetch failed', err);
+      const r = await authedRequest<Transaction[]>(`/api/transactions?month=${month}`, { method: "GET" });
+      if (!r.ok) throw new Error(r.error || "Alınmadı");
+      const list = r.data || [];
+      setTransactions(list);
+      setCurrentMonth(month);
+      await jset(TKEY, list);
+    } catch (e:any) {
+      setError(e.message || "Xəta");
+    } finally {
+      setLoading(false);
     }
-  }, [authedRequest, token]);
+  }, [authedRequest]);
 
-  useEffect(() => {
-    if (token) {
-      refreshLimits();
-    } else {
-      setLimits([]);
+      const createTransaction = useCallback(async (payload: CreateTransactionPayload) => {
+    setLoading(true); setError(null);
+    try {
+      const r = await authedRequest<Transaction>("/api/transactions", { method:"POST", body: JSON.stringify(payload) });
+      if (!r.ok || !r.data) throw new Error(r.error || "Əlavə edilmədi");
+      const tx = r.data;
+
+      setTransactions(prev => {
+        const updated = [tx, ...prev].sort((a,b)=>+new Date(b.date)-+new Date(a.date));
+        jset(TKEY, updated);
+        return updated;
+      });
+      return true;
+    } catch(e:any) {
+      setError(e.message || "Xəta");
+      return false;
+    } finally {
+      setLoading(false);
     }
-  }, [token, refreshLimits]);
+  }, [authedRequest]);
 
-  const loadTransactions = useCallback(
-    async (month: string) => {
-      if (!month) return;
-      setLoading(true);
-      setError(null);
-      try {
-        const result = await authedRequest<Transaction[]>(
-          `/api/transactions?month=${month}`,
-          { method: 'GET' }
-        );
-        if (!result.ok) {
-          throw new Error(result.error || 'Əməliyyatları almaq mümkün olmadı');
-        }
-        setTransactions(result.data || []);
-        setCurrentMonth(month);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Naməlum xəta baş verdi');
-      } finally {
-        setLoading(false);
-      }
-    },
-    [authedRequest]
-  );
+      const updateTransaction = useCallback(async (id: string, patch: UpdateTransactionPatch) => {
+    setLoading(true); setError(null);
+    try {
+      const r = await authedRequest<Transaction>(`/api/transactions/${id}`, { method:"PATCH", body: JSON.stringify(patch) });
+      if (!r.ok || !r.data) throw new Error(r.error || "Yenilənmədi");
+      setTransactions(prev => {
+        const updated = prev.map(t => (t._id===id ? r.data! : t));
+        jset(TKEY, updated);
+        return updated;
+      });
+      return true;
+    } catch(e:any) {
+      setError(e.message || "Xəta");
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }, [authedRequest]);
 
-  const checkAndNotifyLimit = useCallback(
-    async (transaction: Transaction, scopedTransactions?: Transaction[]) => {
-      if (transaction.type !== 'expense' || !limits.length) return;
-      const limitEntry = limits.find(
-        (item) => item.category.toLowerCase() === (transaction.category || '').toLowerCase()
-      );
-      if (!limitEntry || limitEntry.monthlyLimit <= 0) return;
-      const monthKey = formatMonthKey(transaction.date);
-      if (!monthKey) return;
-      let monthTransactions = scopedTransactions;
-      if (!monthTransactions) {
-        try {
-          const result = await authedRequest<Transaction[]>(`/api/transactions?month=${monthKey}`, {
-            method: 'GET',
-          });
-          if (!result.ok || !result.data) return;
-          monthTransactions = result.data;
-        } catch (err) {
-          console.warn('Limit month fetch failed', err);
-          return;
-        }
-      }
+      const deleteTransaction = useCallback(async (id: string) => {
+    setLoading(true); setError(null);
+    try {
+      const r = await authedRequest<null>(`/api/transactions/${id}`, { method:"DELETE" });
+      if (!r.ok) throw new Error(r.error || "Silinmədi");
+      setTransactions(prev => {
+        const updated = prev.filter(t => t._id !== id);
+        jset(TKEY, updated);
+        return updated;
+      });
+      return true;
+    } catch(e:any) {
+      setError(e.message || "Xəta");
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }, [authedRequest]);
 
-      const monthTotal = monthTransactions
-        .filter(
-          (tx) =>
-            tx.type === 'expense' &&
-            tx.category &&
-            tx.category.toLowerCase() === (transaction.category || '').toLowerCase()
-        )
-        .reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
+  // ===== Categories local ops
+      const addCategory = useCallback(async (name: string, type: "income"|"expense", limit?: number) => {
+    const c: Category = {
+      id: `custom-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
+      name,
+      type,
+      limit,
+      builtIn: false,
+    };
+    setCustomCategories(prev => {
+      const next = [...prev, c];
+      persistCustomCategories(next);
+      return next;
+    });
+    showToast("Kateqoriya əlavə olundu");
+  }, []);
 
-      if (monthTotal <= 0) return;
-      const ratio = monthTotal / limitEntry.monthlyLimit;
-      if (ratio >= 1) {
-        showLimitNotification(
-          `"${transaction.category}" limiti keçdi (${monthTotal.toFixed(2)} / ${limitEntry.monthlyLimit} AZN).`
-        );
-      } else if (ratio >= 0.8) {
-        showLimitNotification(
-          `"${transaction.category}" limiti ${Math.round(ratio * 100)}% doldu (${monthTotal.toFixed(
-            2
-          )} / ${limitEntry.monthlyLimit} AZN).`
-        );
-      }
-    },
-    [limits, authedRequest, showLimitNotification]
-  );
+      const removeCategory = useCallback(async (id: string) => {
+    setCustomCategories(prev => {
+      const next = prev.filter(c => c.id !== id);
+      persistCustomCategories(next);
+      return next;
+    });
+  }, []);
 
-  const createTransaction = useCallback(
-    async (payload: CreateTransactionPayload) => {
-      setError(null);
-      setLoading(true);
-      try {
-        const result = await authedRequest<Transaction>('/api/transactions', {
-          method: 'POST',
-          body: JSON.stringify(payload),
-        });
-        if (!result.ok || !result.data) {
-          throw new Error(result.error || 'Əməliyyat əlavə olunmadı');
-        }
-        const txMonth = formatMonthKey(result.data.date);
-        let scopedTransactions: Transaction[] | undefined;
-        if (currentMonth && txMonth === currentMonth) {
-          setTransactions((prev) => {
-            const updated = [result.data, ...prev].sort(
-              (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-            );
-            scopedTransactions = updated;
-            return updated;
-          });
-        }
-        await checkAndNotifyLimit(result.data, scopedTransactions);
-        return true;
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Əməliyyat əlavə edilə bilmədi');
-        return false;
-      } finally {
-        setLoading(false);
-      }
-    },
-    [authedRequest, currentMonth, checkAndNotifyLimit]
-  );
+      const refreshLocalDerived = useCallback(() => {
+    setCustomCategories(prev => [...prev]);
+  }, []);
+  const addReminder = useCallback(async (r: Reminder) => {
+    setReminders(prev => { const next=[...prev, r]; jset(RKEY,next); return next; });
 
-  const updateTransaction = useCallback(
-    async (id: string, patch: UpdateTransactionPatch) => {
-      setError(null);
-      setLoading(true);
-      try {
-        const result = await authedRequest<Transaction>(`/api/transactions/${id}`, {
-          method: 'PATCH',
-          body: JSON.stringify(patch),
-        });
-        if (!result.ok || !result.data) {
-          throw new Error(result.error || 'Əməliyyat yenilənmədi');
-        }
-        setTransactions((prev) =>
-          prev.map((tx) => (tx._id === id ? result.data : tx))
-        );
-        return true;
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Əməliyyatı yeniləmək olmadı');
-        return false;
-      } finally {
-        setLoading(false);
-      }
-    },
-    [authedRequest]
-  );
+    const start = new Date(r.startDate);
+    const end = r.endDate ? new Date(r.endDate) : start;
+    const scheduled: Promise<string>[] = [];
+    for (let cursor = new Date(start.getTime()); cursor.getTime() <= end.getTime(); cursor.setDate(cursor.getDate() + 1)) {
+      const when = new Date(cursor.getTime());
+      when.setHours(r.atHour ?? 9, 0, 0, 0);
+      scheduled.push(scheduleAt(when, {
+        title: r.title,
+        body: r.kind === "income" ? "Gəliri daxil et" : `${r.category} xərcini daxil et`,
+        data: { action: r.action, category: r.category, incomeSubtype: r.incomeSubtype }
+      }));
+    }
+    await Promise.all(scheduled);
+    showToast("Xatırlatma planlaşdırıldı");
+  }, []);
+const removeReminder = useCallback(async (id: string) => {
+    setReminders(prev => { const u=prev.filter(x=>x.id!==id); jset(RKEY,u); return u; });
+  }, []);
 
-  const deleteTransaction = useCallback(
-    async (id: string) => {
-      setError(null);
-      setLoading(true);
-      try {
-        const result = await authedRequest<null>(`/api/transactions/${id}`, {
-          method: 'DELETE',
-        });
-        if (!result.ok) {
-          throw new Error(result.error || 'Əməliyyatı silmək olmadı');
-        }
-        setTransactions((prev) => prev.filter((tx) => tx._id !== id));
-        return true;
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Əməliyyatı silmək olmadı');
-        return false;
-      } finally {
-        setLoading(false);
-      }
-    },
-    [authedRequest]
-  );
+  const value = useMemo(()=>({
+    transactions, categories, reminders,
+    loading, error, currentMonth,
+    loadTransactions, createTransaction, updateTransaction, deleteTransaction,
+    addCategory, removeCategory, refreshLocalDerived,
+    addReminder, removeReminder
+  }), [transactions,categories,reminders,loading,error,currentMonth]);
 
-  const value = useMemo(
-    () => ({
-      transactions,
-      loading,
-      error,
-      currentMonth,
-      limits,
-      loadTransactions,
-      refreshLimits,
-      createTransaction,
-      updateTransaction,
-      deleteTransaction,
-    }),
-    [
-      transactions,
-      loading,
-      error,
-      currentMonth,
-      limits,
-      loadTransactions,
-      refreshLimits,
-      createTransaction,
-      updateTransaction,
-      deleteTransaction,
-    ]
-  );
-
-  return (
-    <TransactionsContext.Provider value={value}>
-      {children}
-    </TransactionsContext.Provider>
-  );
+  return <TransactionsContext.Provider value={value}>{children}</TransactionsContext.Provider>;
 };
 
 export const useTransactions = () => useContext(TransactionsContext);
+
+// ===== Helpers
+function normalizeCustomCategories(cats: Category[] = []): Category[] {
+  return cats
+    .filter(Boolean)
+    .map((cat) => ({
+      ...cat,
+      builtIn: false,
+      spent: 0,
+    }));
+}
+
+function composeCategories(customCats: Category[], txs: Transaction[]): Category[] {
+  const map = new Map<string, Category>();
+  const push = (cat: Category) => {
+    const key = `${cat.type}:${cat.name.toLowerCase()}`;
+    map.set(key, { ...cat, spent: 0 });
+  };
+
+  DEFAULT_CATEGORIES.forEach((cat) =>
+    push({ ...cat, builtIn: true })
+  );
+  customCats.forEach((cat) => push({ ...cat, builtIn: false }));
+
+  for (const tx of txs) {
+    if (tx.type !== "expense") continue;
+    const key = `expense:${(tx.category || "").toLowerCase()}`;
+    if (map.has(key)) {
+      const current = map.get(key)!;
+      map.set(key, { ...current, spent: (current.spent ?? 0) + Math.abs(tx.amount) });
+    }
+  }
+
+  return Array.from(map.values());
+}
+
+function persistCustomCategories(list: Category[]) {
+  const payload = list.map(({ spent, ...rest }) => rest);
+  jset(CKEY, payload);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

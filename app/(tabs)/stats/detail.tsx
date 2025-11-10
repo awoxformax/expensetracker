@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import { useRouter } from "expo-router";
 import { useTransactions, Transaction } from "../../../src/context/TransactionsContext";
 
 const MONTH_NAMES = ["Yan", "Fev", "Mar", "Apr", "May", "İyun", "İyul", "Avq", "Sen", "Okt", "Noy", "Dek"];
@@ -69,6 +70,7 @@ const computeInsight = (transactions: Transaction[]) => {
 };
 
 export default function DetailScreen() {
+  const router = useRouter();
   const { transactions, loadTransactions, loading, error } = useTransactions();
   const [selectedDate, setSelectedDate] = useState(() => new Date());
   const monthKey = useMemo(() => formatMonthKey(selectedDate), [selectedDate]);
@@ -144,7 +146,13 @@ export default function DetailScreen() {
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
         <LinearGradient colors={["#F5F9FF", "#FFFFFF"]} style={styles.header}>
           <View style={styles.topRow}>
-            <Ionicons name="chevron-back" size={22} color="#1E293B" />
+            <TouchableOpacity
+              onPress={() => router.back()}
+              style={styles.backBtn}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="chevron-back" size={22} color="#1E293B" />
+            </TouchableOpacity>
             <Text style={styles.headerTitle}>Aylıq balansın</Text>
             <Ionicons name="stats-chart-outline" size={20} color="#1E293B" />
           </View>
@@ -240,6 +248,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
+  backBtn: { padding: 4, borderRadius: 999 },
   headerTitle: { fontSize: 15, fontWeight: "600", color: "#1E293B" },
   monthRow: {
     flexDirection: "row",
@@ -335,4 +344,3 @@ const styles = StyleSheet.create({
     color: "#1E293B",
   },
 });
-

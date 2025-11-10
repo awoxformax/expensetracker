@@ -1,32 +1,51 @@
-import React, { createContext, useContext, useMemo, useState } from 'react';
-import { DEFAULT_PRESET, PresetName, Themes, AppTheme } from './colors';
+import React, { createContext, useContext, useState } from 'react';
 
 type ThemeContextType = {
-  preset: PresetName;
-  colors: AppTheme;
-  fonts: { heading: string; body: string };
-  setPreset: (p: PresetName) => void;
+  isDarkMode: boolean;
+  toggleTheme: () => void;
+  colors: {
+    background: string;
+    text: string;
+    textMuted: string;
+    primary: string;
+    card: string;
+  };
+  fonts: {
+    heading: string;
+    body: string;
+  };
 };
 
-const ThemeContext = createContext<ThemeContextType>({
-  preset: DEFAULT_PRESET,
-  colors: Themes[DEFAULT_PRESET],
-  fonts: { heading: 'DMSans_700Bold', body: 'DMSans_400Regular' },
-  setPreset: () => {},
-});
+const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
-export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
-  const [preset, setPreset] = useState<PresetName>(DEFAULT_PRESET);
+export function ThemeProvider({ children }: { children: React.ReactNode }) {
+  const [isDarkMode, setIsDarkMode] = useState(false);
 
-  const value = useMemo(() => ({
-    preset,
-    colors: Themes[preset],
-    // Use system fonts by default; can be overridden later when custom fonts are available
-    fonts: { heading: 'System', body: 'System' },
-    setPreset,
-  }), [preset]);
+  const toggleTheme = () => setIsDarkMode(!isDarkMode);
 
-  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
+  const theme = {
+    isDarkMode,
+    toggleTheme,
+    colors: {
+      background: isDarkMode ? '#1E293B' : '#F1F5F9',
+      text: isDarkMode ? '#F1F5F9' : '#1E293B',
+      textMuted: isDarkMode ? '#94A3B8' : '#64748B',
+      primary: '#0EA5E9',
+      card: isDarkMode ? '#334155' : '#FFFFFF',
+    },
+    fonts: {
+      heading: 'System',
+      body: 'System',
+    },
+  };
+
+  return <ThemeContext.Provider value={theme}>{children}</ThemeContext.Provider>;
+}
+
+export const useTheme = () => {
+  const context = useContext(ThemeContext);
+  if (context === undefined) {
+    throw new Error('useTheme must be used within a ThemeProvider');
+  }
+  return context;
 };
-
-export const useTheme = () => useContext(ThemeContext);

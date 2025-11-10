@@ -1,413 +1,987 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState, useEffect } from "react";
 import {
-  Alert,
-  Platform,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Switch,
-  Text,
-  TextInput,
-  ToastAndroid,
-  TouchableOpacity,
   View,
-} from 'react-native';
-import { useTheme } from '../../src/theme/ThemeProvider';
-import { useTransactions } from '../../src/context/TransactionsContext';
-import { useAuth } from '../../src/context/AuthContext';
-import { API_BASE_URL } from '../../src/lib/config';
-import { scheduleLocal, scheduleRecurringReminder } from '../../src/lib/notify';
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  TextInput,
+  Modal,
+  Platform,
+  Alert,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
+import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
+import { useRouter, useLocalSearchParams } from "expo-router";
+import { useTransactions, Category, Reminder } from "../../src/context/TransactionsContext";
 
-const showToast = (message: string) => {
-  if (Platform.OS === 'android') {
-    ToastAndroid.show(message, ToastAndroid.SHORT);
-  } else {
-    Alert.alert(message);
-  }
+const COLORS = {
+  background: "#F7F9FD",
+  card: "#FFFFFF",
+  primary: "#2563EB",
+  secondary: "#EEF2FF",
+  text: "#0F172A",
+  muted: "#64748B",
+  border: "#E2E8F0",
 };
 
-const formatInputDate = (date: Date) => date.toISOString().split('T')[0];
-
-const parseInputDate = (value: string) => {
-  const [year, month, day] = value.split('-').map((v) => Number(v));
-  if (!year || !month || !day) {
-    return null;
-  }
-  const parsed = new Date(year, month - 1, day);
-  if (Number.isNaN(parsed.getTime())) {
-    return null;
-  }
-  return parsed;
+type FormConfig = {
+  visible: boolean;
+  type: "income" | "expense";
+  presetCategory?: string;
 };
 
-type Frequency = 'monthly' | 'weekly';
+const amountLabel = (value?: number) => `${(value ?? 0).toFixed(2)} AZN`;
 
-export default function TransactionsRoute() {
-  const today = useMemo(() => formatInputDate(new Date()), []);
-  const { colors, fonts } = useTheme();
-  const { token } = useAuth();
-  const { createTransaction, loading, error } = useTransactions();
-  const inputBorderColor = useMemo(() => `${colors.textMuted}55`, [colors.textMuted]);
-
-  const [type, setType] = useState<'income' | 'expense'>('expense');
-  const [category, setCategory] = useState('');
-  const [amount, setAmount] = useState('');
-  const [note, setNote] = useState('');
-  const [dateValue, setDateValue] = useState(today);
-  const [remind, setRemind] = useState(false);
-  const [isRecurring, setIsRecurring] = useState(false);
-  const [frequency, setFrequency] = useState<Frequency>('monthly');
-  const [localError, setLocalError] = useState<string | null>(null);
-  const [notificationId, setNotificationId] = useState<string | null>(null);
-  const [submittingRecurring, setSubmittingRecurring] = useState(false);
-
-  const isSubmitting = loading || submittingRecurring;
-
-  const resetForm = () => {
-    setCategory('');
-    setAmount('');
-    setNote('');
-    setRemind(false);
-    setIsRecurring(false);
-    setFrequency('monthly');
+export default function TransactionsScreen() {
+  const router = useRouter();
+  const { categories, reminders, createTransaction, addCategory, addReminder } = useTransactions();
+  const incomeSubtypeLabels: Record<"salary" | "stipend" | "other", string> = {
+    salary: "Maaş",
+    stipend: "Stipendiya",
+    other: "Digər gəlir",
+  };
+  const creditProfileLabels: Record<"student" | "family" | "other", string> = {
+    student: "Tələbə",
+    family: "Ailə başçısı",
+    other: "Digər",
   };
 
-  const handleRecurringSubmit = async (
-    parsedDate: Date,
-    payload: {
-      type: 'income' | 'expense';
-      category: string;
-      amount: number;
-      note?: string;
-      date: string;
-      notify: boolean;
-    }
-  ) => {
-    if (!token) {
-      setLocalError('Sessiya tapılmadı, yenidən giriş edin.');
-      return;
-    }
-    const repeatRule =
-      frequency === 'monthly'
-        ? { freq: 'monthly', dayOfMonth: parsedDate.getDate() }
-        : { freq: 'weekly', weekday: parsedDate.getDay() };
+  const expenseCategories = useMemo(
+    () => categories.filter((cat) => cat.type === "expense"),
+    [categories]
+  );
+  const incomeCategories = useMemo(
+    () => categories.filter((cat) => cat.type === "income"),
+    [categories]
+  );
 
-    setSubmittingRecurring(true);
-    setLocalError(null);
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/recurring`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...payload,
-          repeatRule,
-        }),
-      });
+  const [formConfig, setFormConfig] = useState<FormConfig>({ visible: false, type: "expense" });
+  const [formCategory, setFormCategory] = useState<string>("");
+  const [formAmount, setFormAmount] = useState<string>("");
+  const [formNote, setFormNote] = useState<string>("");
+  const [formDate, setFormDate] = useState<Date>(new Date());
+  const [showDatePicker, setShowDatePicker] = useState<boolean>(Platform.OS === "ios");
 
-      const data = await response.json();
-      if (!response.ok || !data.ok) {
-        throw new Error(data.error || 'Müntəzəm əməliyyatı yaratmaq olmadı');
-      }
+  const [categoryModalVisible, setCategoryModalVisible] = useState(false);
+  const [newCatName, setNewCatName] = useState("");
+  const [newCatType, setNewCatType] = useState<"income" | "expense">("expense");
+  const [newCatLimit, setNewCatLimit] = useState("");
 
-      if (payload.notify && data.data?._id) {
-        const scheduledId = await scheduleRecurringReminder(
-          data.data._id,
-          type,
-          parsedDate,
-          'Xatırlatma',
-          `${payload.category} əməliyyatını unutma`
-        );
-        setNotificationId(scheduledId);
-        showToast('Xatırlatma quruldu');
-      }
+  const params = useLocalSearchParams<{
+    newReminder?: string;
+    captureIncome?: string;
+    subtype?: string;
+    captureExpense?: string;
+    category?: string;
+    type?: string;
+  }>();
 
-      showToast('Müntəzəm əməliyyat əlavə olundu');
-      resetForm();
-    } catch (err) {
-      setLocalError(err instanceof Error ? err.message : 'Xəta baş verdi');
-    } finally {
-      setSubmittingRecurring(false);
+  const [reminderModalVisible, setReminderModalVisible] = useState(false);
+  const [reminderKind, setReminderKind] = useState<"income" | "expense">("income");
+  const [incomeSubtype, setIncomeSubtype] = useState<"salary" | "stipend" | "other">("salary");
+  const [creditProfile, setCreditProfile] = useState<"student" | "family" | "other">("student");
+  const [reminderStart, setReminderStart] = useState<Date>(new Date());
+  const [reminderEnd, setReminderEnd] = useState<Date>(new Date());
+  const [reminderDue, setReminderDue] = useState<Date>(new Date());
+  const [showReminderStartPicker, setShowReminderStartPicker] = useState<boolean>(false);
+  const [showReminderEndPicker, setShowReminderEndPicker] = useState<boolean>(false);
+  const [showReminderDuePicker, setShowReminderDuePicker] = useState<boolean>(false);
+
+  const openReminderModal = useCallback(() => {
+    const now = new Date();
+    setReminderKind("income");
+    setIncomeSubtype("salary");
+    setCreditProfile("student");
+    setReminderStart(now);
+    setReminderEnd(now);
+    setReminderDue(now);
+    setShowReminderStartPicker(Platform.OS === "ios");
+    setShowReminderEndPicker(Platform.OS === "ios");
+    setShowReminderDuePicker(Platform.OS === "ios");
+    setReminderModalVisible(true);
+  }, []);
+
+  const closeReminderModal = () => setReminderModalVisible(false);
+
+  const openTransactionForm = useCallback(
+    (type: "income" | "expense", preset?: string) => {
+      const fallbackCategory =
+        type === "expense" ? expenseCategories[0]?.name : incomeCategories[0]?.name;
+      setFormConfig({ visible: true, type, presetCategory: preset });
+      setFormCategory(preset || fallbackCategory || "");
+      setFormAmount("");
+      setFormNote("");
+      setFormDate(new Date());
+      setShowDatePicker(Platform.OS === "ios");
+    },
+    [expenseCategories, incomeCategories]
+  );
+
+  const closeTransactionForm = () => setFormConfig((prev) => ({ ...prev, visible: false }));
+
+  const handleDateChange = (_: DateTimePickerEvent, selected?: Date) => {
+    if (Platform.OS === "android") setShowDatePicker(false);
+    if (selected) setFormDate(selected);
+  };
+
+  const handleReminderStartChange = (_: DateTimePickerEvent, selected?: Date) => {
+    if (Platform.OS === "android") setShowReminderStartPicker(false);
+    if (selected) {
+      setReminderStart(selected);
+      if (selected > reminderEnd) setReminderEnd(selected);
     }
   };
 
-  const handleSubmit = async () => {
-    const numericAmount = Number(amount);
-    if (!category.trim()) {
-      setLocalError('Kateqoriya tələb olunur');
-      return;
-    }
-    if (Number.isNaN(numericAmount) || numericAmount <= 0) {
-      setLocalError('Məbləği düzgün daxil edin');
-      return;
-    }
-    const parsedDate = parseInputDate(dateValue);
-    if (!parsedDate) {
-      setLocalError('Tarix formatı YYYY-MM-DD olmalıdır');
-      return;
-    }
-    setLocalError(null);
+  const handleReminderEndChange = (_: DateTimePickerEvent, selected?: Date) => {
+    if (Platform.OS === "android") setShowReminderEndPicker(false);
+    if (selected) setReminderEnd(selected);
+  };
 
-    const basePayload = {
-      type,
-      category: category.trim(),
+  const handleReminderDueChange = (_: DateTimePickerEvent, selected?: Date) => {
+    if (Platform.OS === "android") setShowReminderDuePicker(false);
+    if (selected) setReminderDue(selected);
+  };
+
+  const submitTransaction = async () => {
+    const numericAmount = Number((formAmount || "").replace(",", "."));
+    if (!formCategory) {
+      Alert.alert("Kateqoriya seçin", "Əvvəlcə kateqoriya seçməlisiniz.");
+      return;
+    }
+    if (!numericAmount || Number.isNaN(numericAmount) || numericAmount <= 0) {
+      Alert.alert("Məbləğ tələb olunur", "Düzgün məbləğ daxil edin.");
+      return;
+    }
+    const ok = await createTransaction({
+      type: formConfig.type,
+      category: formCategory,
       amount: numericAmount,
-      note: note.trim() || undefined,
-      date: parsedDate.toISOString(),
-      notify: remind,
+      note: formNote.trim() || undefined,
+      date: formDate.toISOString(),
+    });
+    if (ok) {
+      closeTransactionForm();
+    }
+  };
+
+  const submitCategory = async () => {
+    if (!newCatName.trim()) {
+      Alert.alert("Boş kateqoriya", "Kateqoriya adı daxil edin.");
+      return;
+    }
+    const parsedLimit = newCatLimit ? Number(newCatLimit.replace(",", ".")) : undefined;
+    if (parsedLimit !== undefined && (Number.isNaN(parsedLimit) || parsedLimit <= 0)) {
+      Alert.alert("Limit səhvdir", "Limit müsbət rəqəm olmalıdır.");
+      return;
+    }
+    await addCategory(newCatName.trim(), newCatType, parsedLimit);
+    setNewCatName("");
+    setNewCatLimit("");
+    setCategoryModalVisible(false);
+  };
+
+  const submitReminder = async () => {
+    if (reminderKind === "income" && reminderEnd.getTime() < reminderStart.getTime()) {
+      Alert.alert("Tarixlər uyğunsuzdur", "Başlanğıc tarixi bitiş tarixindən böyük ola bilməz.");
+      return;
+    }
+
+    const reminderPayload: Reminder = {
+      id: `rem-${Date.now()}`,
+      kind: reminderKind,
+      title:
+        reminderKind === "income"
+          ? `${incomeSubtypeLabels[incomeSubtype]} xatırlatması`
+          : `Kredit (${creditProfileLabels[creditProfile]})`,
+      action: reminderKind === "income" ? "open_income_form" : "navigate_category",
+      category: reminderKind === "expense" ? "Kredit" : undefined,
+      incomeSubtype: reminderKind === "income" ? incomeSubtype : undefined,
+      startDate: reminderKind === "income" ? reminderStart.toISOString() : reminderDue.toISOString(),
+      endDate: reminderKind === "income" ? reminderEnd.toISOString() : undefined,
+      atHour: reminderKind === "income" ? 9 : 8,
     };
 
-    if (isRecurring) {
-      await handleRecurringSubmit(parsedDate, basePayload);
-      return;
-    }
-
-    const success = await createTransaction(basePayload);
-    if (!success) return;
-
-    if (remind) {
-      try {
-        const id = await scheduleLocal(
-          type,
-          parsedDate,
-          'Xatırlatma',
-          `${basePayload.category} əməliyyatını unutma`
-        );
-        setNotificationId(id);
-        showToast('Xatırlatma quruldu');
-      } catch (err) {
-        console.warn('Failed to schedule local reminder', err);
-      }
-    }
-
-    showToast('Əməliyyat əlavə olundu');
-    resetForm();
+    await addReminder(reminderPayload);
+    closeReminderModal();
   };
 
-  return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <Text style={[styles.title, { color: colors.text, fontFamily: fonts.heading }]}>Əməliyyat əlavə et</Text>
-        <Text style={[styles.subtitle, { color: colors.textMuted, fontFamily: fonts.body }]}>
-          Müntəzəm və ya tək əməliyyatları buradan yarat, istəsən xatırlatma qur.
+  useEffect(() => {
+    if (params.newReminder && !reminderModalVisible) {
+      openReminderModal();
+      router.replace("/(tabs)/transactions");
+    }
+  }, [params.newReminder, reminderModalVisible, openReminderModal, router]);
+
+  useEffect(() => {
+    if (params.captureIncome && !formConfig.visible) {
+      const subtype = (params.subtype as "salary" | "stipend" | "other") || "salary";
+      const matchByName = (needle: string) =>
+        incomeCategories.find((cat) => cat.name.toLowerCase().includes(needle))?.name;
+      const presetName =
+        (subtype === "stipend" ? matchByName("stip") : undefined) ||
+        (subtype === "salary" ? matchByName("maa") : undefined) ||
+        incomeCategories[0]?.name ||
+        "";
+
+      Alert.alert(
+        "Maaşınız köçdü?",
+        "Məbləği qeyd etmək istəyirsiniz?",
+        [
+          {
+            text: "Daha sonra",
+            style: "cancel",
+            onPress: () => router.replace("/(tabs)/transactions"),
+          },
+          {
+            text: "Bəli",
+            onPress: () => {
+              openTransactionForm("income", presetName);
+              setFormNote(incomeSubtypeLabels[subtype]);
+              router.replace("/(tabs)/transactions");
+            },
+          },
+        ]
+      );
+    }
+  }, [
+    params.captureIncome,
+    params.subtype,
+    formConfig.visible,
+    incomeCategories,
+    incomeSubtypeLabels,
+    openTransactionForm,
+    router,
+  ]);
+
+  useEffect(() => {
+    if (params.captureExpense && !formConfig.visible) {
+      const categoryParam = (params.category as string) || "Kredit";
+      const matched =
+        expenseCategories.find((cat) =>
+          cat.name.toLowerCase().includes(categoryParam.toLowerCase())
+        )?.name || categoryParam;
+
+      Alert.alert(
+        "Kredit ödənişi",
+        "Ödənişi qeyd etmək istəyirsiniz?",
+        [
+          {
+            text: "Sonra",
+            style: "cancel",
+            onPress: () => router.replace("/(tabs)/transactions"),
+          },
+          {
+            text: "İndi qeyd et",
+            onPress: () => {
+              openTransactionForm("expense", matched);
+              setFormNote("Kredit ödənişi");
+              router.replace("/(tabs)/transactions");
+            },
+          },
+        ]
+      );
+    }
+  }, [
+    params.captureExpense,
+    params.category,
+    formConfig.visible,
+    expenseCategories,
+    openTransactionForm,
+    router,
+  ]);
+
+  useEffect(() => {
+    if (params.type && !formConfig.visible) {
+      const presetType = params.type === "income" ? "income" : "expense";
+      openTransactionForm(presetType);
+      router.replace("/(tabs)/transactions");
+    }
+  }, [params.type, formConfig.visible, openTransactionForm, router]);
+
+  useEffect(() => {
+    if (reminderKind === "income") {
+      setShowReminderDuePicker(false);
+    } else {
+      setShowReminderStartPicker(false);
+      setShowReminderEndPicker(false);
+    }
+  }, [reminderKind]);
+
+  const recentReminders = useMemo(
+    () =>
+      reminders
+        .slice()
+        .sort(
+          (a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime()
+        )
+        .slice(0, 3),
+    [reminders]
+  );
+
+  const reminderLabel = (dateISO: string) => {
+    const d = new Date(dateISO);
+    return `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(
+      2,
+      "0"
+    )}.${d.getFullYear()}`;
+  };
+
+  const renderCategoryCard = (cat: Category) => {
+    const progress =
+      cat.limit && cat.limit > 0 ? Math.min((cat.spent ?? 0) / cat.limit, 1) : 0;
+    return (
+      <View key={cat.id} style={styles.categoryCard}>
+        <View style={styles.categoryHeader}>
+          <View style={[styles.categoryIcon, { backgroundColor: cat.color ?? COLORS.secondary }]}>
+            <Ionicons name={(cat.icon as any) || "pricetag-outline"} size={18} color="#1E1E1E" />
+          </View>
+          <Text style={styles.categoryTitle}>{cat.name}</Text>
+        </View>
+        <Text style={styles.categoryMeta}>
+          {cat.limit
+            ? `${amountLabel(cat.spent)} / ${cat.limit.toFixed(2)} AZN`
+            : `${amountLabel(cat.spent)} bu ay`}
         </Text>
-
-        <View style={styles.segmented}>
-          {(['expense', 'income'] as const).map((item) => (
-            <TouchableOpacity
-              key={item}
-              style={[
-                styles.segmentButton,
-                {
-                  backgroundColor: type === item ? colors.primary : colors.card,
-                },
-              ]}
-              onPress={() => setType(item)}
-            >
-              <Text
-                style={[
-                  styles.segmentText,
-                  {
-                    color: type === item ? '#fff' : colors.text,
-                  },
-                ]}
-              >
-                {item === 'expense' ? 'Xərc' : 'Gəlir'}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        <View style={styles.formGroup}>
-          <Text style={[styles.label, { color: colors.textMuted }]}>Kateqoriya</Text>
-          <TextInput
-            style={[styles.input, { borderColor: inputBorderColor, color: colors.text }]}
-            placeholder="məs: Qida"
-            placeholderTextColor={colors.textMuted}
-            value={category}
-            onChangeText={setCategory}
-          />
-        </View>
-
-        <View style={styles.formGroup}>
-          <Text style={[styles.label, { color: colors.textMuted }]}>Məbləğ</Text>
-          <TextInput
-            style={[styles.input, { borderColor: inputBorderColor, color: colors.text }]}
-            placeholder="0.00"
-            placeholderTextColor={colors.textMuted}
-            keyboardType="decimal-pad"
-            value={amount}
-            onChangeText={setAmount}
-          />
-        </View>
-
-        <View style={styles.formGroup}>
-          <Text style={[styles.label, { color: colors.textMuted }]}>Tarix (YYYY-MM-DD)</Text>
-          <TextInput
-            style={[styles.input, { borderColor: inputBorderColor, color: colors.text }]}
-            placeholder={today}
-            placeholderTextColor={colors.textMuted}
-            value={dateValue}
-            onChangeText={setDateValue}
-          />
-        </View>
-
-        <View style={styles.formGroup}>
-          <Text style={[styles.label, { color: colors.textMuted }]}>Qeyd</Text>
-          <TextInput
-            style={[styles.input, { borderColor: inputBorderColor, color: colors.text, height: 80 }]}
-            placeholder="Qısa qeyd"
-            placeholderTextColor={colors.textMuted}
-            value={note}
-            onChangeText={setNote}
-            multiline
-          />
-        </View>
-
-        <View style={styles.toggleRow}>
-          <View>
-            <Text style={[styles.label, { color: colors.text }]}>Müntəzəm</Text>
-            <Text style={[styles.helper, { color: colors.textMuted }]}>
-              Həftəlik və ya aylıq təkrarlanan əməliyyat yarat
-            </Text>
+        {cat.limit ? (
+          <View style={styles.progressTrack}>
+            <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
           </View>
-          <Switch value={isRecurring} onValueChange={setIsRecurring} />
-        </View>
-
-        {isRecurring && (
-          <View style={styles.formGroup}>
-            <Text style={[styles.label, { color: colors.textMuted }]}>Dövrilik</Text>
-            <View style={styles.segmented}>
-              {(['monthly', 'weekly'] as const).map((item) => (
-                <TouchableOpacity
-                  key={item}
-                  style={[
-                    styles.segmentButton,
-                    {
-                      backgroundColor: frequency === item ? colors.primary : colors.card,
-                    },
-                  ]}
-                  onPress={() => setFrequency(item)}
-                >
-                  <Text
-                    style={[
-                      styles.segmentText,
-                      {
-                        color: frequency === item ? '#fff' : colors.text,
-                      },
-                    ]}
-                  >
-                    {item === 'monthly' ? 'Aylıq' : 'Həftəlik'}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
+        ) : (
+          <View style={styles.spacer} />
         )}
-
-        <View style={styles.toggleRow}>
-          <View>
-            <Text style={[styles.label, { color: colors.text }]}>Xatırlatma</Text>
-            <Text style={[styles.helper, { color: colors.textMuted }]}>
-              Tarixdə 10:00-da yerli bildiriş al
-            </Text>
-          </View>
-          <Switch value={remind} onValueChange={setRemind} />
-        </View>
-
-        {(localError || error) && (
-          <Text style={styles.errorText}>{localError || error}</Text>
-        )}
-
-        {notificationId && (
-          <Text style={[styles.helper, { color: colors.textMuted }]}>
-            Son xatırlatma ID: {notificationId}
-          </Text>
-        )}
-
         <TouchableOpacity
-          style={[
-            styles.submitButton,
-            { backgroundColor: isSubmitting ? colors.card : colors.primary },
-          ]}
-          onPress={handleSubmit}
-          disabled={isSubmitting}
+          style={styles.cardButton}
+          onPress={() => openTransactionForm("expense", cat.name)}
         >
-          <Text style={styles.submitText}>{isSubmitting ? 'Göndərilir...' : 'Əlavə et'}</Text>
+          <Ionicons name="add" size={16} color="#fff" />
+          <Text style={styles.cardButtonText}>Xərc əlavə et</Text>
         </TouchableOpacity>
+      </View>
+    );
+  };
+
+  const categoryOptions =
+    formConfig.type === "expense" ? expenseCategories : incomeCategories;
+
+  return (
+    <SafeAreaView style={styles.safe}>
+      <ScrollView contentContainerStyle={styles.scroll}>
+        <View style={styles.hero}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.heroTitle}>Əməliyyatlar</Text>
+            <Text style={styles.heroSub}>
+              Gəlir və xərcləri izləyin, kateqoriyalara limit qoyun və hamısı sinxron qalsın.
+            </Text>
+          </View>
+          <View style={styles.heroActions}>
+            <TouchableOpacity
+              style={[styles.heroButton, styles.heroButtonPrimary]}
+              onPress={() => openTransactionForm("income")}
+            >
+              <Ionicons name="trending-up-outline" size={18} color="#fff" />
+              <Text style={styles.heroButtonTextPrimary}>Gəlir əlavə et</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.heroButton, styles.heroButtonSecondary]}
+              onPress={() => openTransactionForm("expense")}
+            >
+              <Ionicons name="cash-outline" size={18} color={COLORS.primary} />
+              <Text style={styles.heroButtonTextSecondary}>Xərc əlavə et</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.sectionHeader}>
+          <View>
+            <Text style={styles.sectionTitle}>Əsas kateqoriyalar</Text>
+            <Text style={styles.sectionSub}>Bütün seçimlərdə avtomatik görünəcək.</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.addChip}
+            onPress={() => setCategoryModalVisible(true)}
+          >
+            <Ionicons name="add" size={18} color={COLORS.primary} />
+            <Text style={styles.addChipText}>Yeni</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.categoryGrid}>
+          {expenseCategories.map(renderCategoryCard)}
+        </View>
+
+        <View style={styles.incomePillSection}>
+          <Text style={styles.sectionTitle}>Gəlir kateqoriyaları</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 12 }}>
+            {incomeCategories.map((cat) => (
+              <TouchableOpacity
+                key={cat.id}
+                style={[
+                  styles.pill,
+                  formConfig.visible &&
+                    formConfig.type === "income" &&
+                    formCategory === cat.name &&
+                    styles.pillActive,
+                ]}
+                onPress={() => openTransactionForm("income", cat.name)}
+              >
+                <Text
+                  style={[
+                    styles.pillText,
+                    formConfig.visible &&
+                      formConfig.type === "income" &&
+                      formCategory === cat.name &&
+                      styles.pillTextActive,
+                  ]}
+                >
+                  {cat.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+
+        <View style={styles.reminderCard}>
+          <View style={styles.sectionHeader}>
+            <View>
+              <Text style={styles.sectionTitle}>Xatırlatmalar</Text>
+              <Text style={styles.sectionSub}>Gəlir və ödənişləri planlaşdır.</Text>
+            </View>
+            <TouchableOpacity style={styles.addChip} onPress={openReminderModal}>
+              <Ionicons name="calendar-outline" size={16} color={COLORS.primary} />
+              <Text style={styles.addChipText}>Yeni</Text>
+            </TouchableOpacity>
+          </View>
+          {recentReminders.length ? (
+            recentReminders.map((reminder) => (
+              <View key={reminder.id} style={styles.reminderRow}>
+                <View style={styles.reminderIcon}>
+                  <Ionicons
+                    name={reminder.kind === "income" ? "trending-up-outline" : "card-outline"}
+                    size={18}
+                    color={COLORS.primary}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.reminderTitle}>{reminder.title}</Text>
+                  <Text style={styles.reminderMeta}>
+                    {reminderLabel(reminder.startDate)}
+                    {reminder.endDate ? ` • ${reminderLabel(reminder.endDate)}` : ""} •{" "}
+                    {reminder.kind === "income" ? "Gəlir" : "Ödəniş"}
+                  </Text>
+                </View>
+              </View>
+            ))
+          ) : (
+            <Text style={styles.emptyText}>Hələ xatırlatma yoxdur.</Text>
+          )}
+        </View>
       </ScrollView>
+
+      <Modal visible={formConfig.visible} transparent animationType="slide">
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                {formConfig.type === "income" ? "Gəlir əlavə et" : "Xərc əlavə et"}
+              </Text>
+              <TouchableOpacity onPress={closeTransactionForm}>
+                <Ionicons name="close" size={24} color={COLORS.text} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={{ maxHeight: 340 }} showsVerticalScrollIndicator={false}>
+              <Text style={styles.modalLabel}>Kateqoriya</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginVertical: 12 }}>
+                {categoryOptions.map((cat) => (
+                  <TouchableOpacity
+                    key={cat.id}
+                    style={[
+                      styles.pill,
+                      formCategory === cat.name && styles.pillActive,
+                    ]}
+                    onPress={() => setFormCategory(cat.name)}
+                  >
+                    <Text
+                      style={[
+                        styles.pillText,
+                        formCategory === cat.name && styles.pillTextActive,
+                      ]}
+                    >
+                      {cat.name}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              <Text style={styles.modalLabel}>Məbləğ</Text>
+              <TextInput
+                value={formAmount}
+                onChangeText={setFormAmount}
+                placeholder="0.00"
+                keyboardType="decimal-pad"
+                style={styles.input}
+              />
+
+              <Text style={[styles.modalLabel, { marginTop: 16 }]}>Qeyd</Text>
+              <TextInput
+                value={formNote}
+                onChangeText={setFormNote}
+                placeholder="Opsional"
+                style={[styles.input, { height: 42 }]}
+              />
+
+              <View style={styles.dateRow}>
+                <Text style={styles.modalLabel}>Tarix</Text>
+                <TouchableOpacity
+                  style={styles.dateChip}
+                  onPress={() => setShowDatePicker(true)}
+                >
+                  <Ionicons name="calendar-outline" size={16} color={COLORS.text} />
+                  <Text style={styles.dateChipText}>{reminderLabel(formDate.toISOString())}</Text>
+                </TouchableOpacity>
+              </View>
+              {showDatePicker && (
+                <DateTimePicker
+                  value={formDate}
+                  mode="date"
+                  display={Platform.OS === "ios" ? "inline" : "default"}
+                  onChange={handleDateChange}
+                />
+              )}
+            </ScrollView>
+
+            <TouchableOpacity style={styles.submitBtn} onPress={submitTransaction}>
+              <Text style={styles.submitText}>Yadda saxla</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={reminderModalVisible} transparent animationType="fade">
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Yeni xatırlatma</Text>
+              <TouchableOpacity onPress={closeReminderModal}>
+                <Ionicons name="close" size={24} color={COLORS.text} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.toggleRow}>
+              <TouchableOpacity
+                style={[styles.toggleChip, reminderKind === "income" && styles.toggleChipActive]}
+                onPress={() => setReminderKind("income")}
+              >
+                <Text
+                  style={[
+                    styles.toggleChipText,
+                    reminderKind === "income" && styles.toggleChipTextActive,
+                  ]}
+                >
+                  Gəlir
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.toggleChip, reminderKind === "expense" && styles.toggleChipActive]}
+                onPress={() => setReminderKind("expense")}
+              >
+                <Text
+                  style={[
+                    styles.toggleChipText,
+                    reminderKind === "expense" && styles.toggleChipTextActive,
+                  ]}
+                >
+                  Ödəniş
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {reminderKind === "income" ? (
+              <>
+                <Text style={styles.modalLabel}>Gəlir növü</Text>
+                <View style={styles.toggleRow}>
+                  {(["salary", "stipend", "other"] as const).map((option) => (
+                    <TouchableOpacity
+                      key={option}
+                      style={[
+                        styles.toggleChip,
+                        incomeSubtype === option && styles.toggleChipActive,
+                      ]}
+                      onPress={() => setIncomeSubtype(option)}
+                    >
+                      <Text
+                        style={[
+                          styles.toggleChipText,
+                          incomeSubtype === option && styles.toggleChipTextActive,
+                        ]}
+                      >
+                        {incomeSubtypeLabels[option]}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                <View style={styles.dateRow}>
+                  <Text style={styles.modalLabel}>Başlanğıc</Text>
+                  <TouchableOpacity
+                    style={styles.dateChip}
+                    onPress={() => setShowReminderStartPicker(true)}
+                  >
+                    <Ionicons name="calendar-outline" size={16} color={COLORS.text} />
+                    <Text style={styles.dateChipText}>{reminderLabel(reminderStart.toISOString())}</Text>
+                  </TouchableOpacity>
+                </View>
+                {showReminderStartPicker && (
+                  <DateTimePicker
+                    value={reminderStart}
+                    mode="date"
+                    display={Platform.OS === "ios" ? "inline" : "default"}
+                    onChange={handleReminderStartChange}
+                  />
+                )}
+
+                <View style={[styles.dateRow, { marginTop: 14 }]}>
+                  <Text style={styles.modalLabel}>Bitmə tarixi</Text>
+                  <TouchableOpacity
+                    style={styles.dateChip}
+                    onPress={() => setShowReminderEndPicker(true)}
+                  >
+                    <Ionicons name="calendar-outline" size={16} color={COLORS.text} />
+                    <Text style={styles.dateChipText}>{reminderLabel(reminderEnd.toISOString())}</Text>
+                  </TouchableOpacity>
+                </View>
+                {showReminderEndPicker && (
+                  <DateTimePicker
+                    value={reminderEnd}
+                    mode="date"
+                    display={Platform.OS === "ios" ? "inline" : "default"}
+                    onChange={handleReminderEndChange}
+                  />
+                )}
+
+                <Text style={styles.reminderInfo}>
+                  Seçilən tarix aralığında hər gün səhər 09:00-da xatırlatma göndəriləcək.
+                </Text>
+              </>
+            ) : (
+              <>
+                <Text style={styles.modalLabel}>Kredit portfeli</Text>
+                <View style={styles.toggleRow}>
+                  {(["student", "family", "other"] as const).map((profile) => (
+                    <TouchableOpacity
+                      key={profile}
+                      style={[
+                        styles.toggleChip,
+                        creditProfile === profile && styles.toggleChipActive,
+                      ]}
+                      onPress={() => setCreditProfile(profile)}
+                    >
+                      <Text
+                        style={[
+                          styles.toggleChipText,
+                          creditProfile === profile && styles.toggleChipTextActive,
+                        ]}
+                      >
+                        {creditProfileLabels[profile]}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                <View style={styles.dateRow}>
+                  <Text style={styles.modalLabel}>Ödəniş günü</Text>
+                  <TouchableOpacity
+                    style={styles.dateChip}
+                    onPress={() => setShowReminderDuePicker(true)}
+                  >
+                    <Ionicons name="calendar-outline" size={16} color={COLORS.text} />
+                    <Text style={styles.dateChipText}>{reminderLabel(reminderDue.toISOString())}</Text>
+                  </TouchableOpacity>
+                </View>
+                {showReminderDuePicker && (
+                  <DateTimePicker
+                    value={reminderDue}
+                    mode="date"
+                    display={Platform.OS === "ios" ? "inline" : "default"}
+                    onChange={handleReminderDueChange}
+                  />
+                )}
+
+                <Text style={styles.reminderInfo}>
+                  Kredit üçün seçdiyiniz gündə saat 08:00-da bildiriş alacaqsınız.
+                </Text>
+              </>
+            )}
+
+            <TouchableOpacity style={[styles.submitBtn, { marginTop: 24 }]} onPress={submitReminder}>
+              <Text style={styles.submitText}>Planlaşdır</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={categoryModalVisible} transparent animationType="fade">
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Yeni kateqoriya</Text>
+              <TouchableOpacity onPress={() => setCategoryModalVisible(false)}>
+                <Ionicons name="close" size={24} color={COLORS.text} />
+              </TouchableOpacity>
+            </View>
+
+            <TextInput
+              style={styles.input}
+              placeholder="Kateqoriya adı"
+              value={newCatName}
+              onChangeText={setNewCatName}
+            />
+            <View style={styles.toggleRow}>
+              <TouchableOpacity
+                style={[
+                  styles.toggleChip,
+                  newCatType === "expense" && styles.toggleChipActive,
+                ]}
+                onPress={() => setNewCatType("expense")}
+              >
+                <Text
+                  style={[
+                    styles.toggleChipText,
+                    newCatType === "expense" && styles.toggleChipTextActive,
+                  ]}
+                >
+                  Xərc
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.toggleChip,
+                  newCatType === "income" && styles.toggleChipActive,
+                ]}
+                onPress={() => setNewCatType("income")}
+              >
+                <Text
+                  style={[
+                    styles.toggleChipText,
+                    newCatType === "income" && styles.toggleChipTextActive,
+                  ]}
+                >
+                  Gəlir
+                </Text>
+              </TouchableOpacity>
+            </View>
+            {newCatType === "expense" && (
+              <TextInput
+                style={[styles.input, { marginTop: 12 }]}
+                placeholder="Aylıq limit (opsional)"
+                keyboardType="numeric"
+                value={newCatLimit}
+                onChangeText={setNewCatLimit}
+              />
+            )}
+            <TouchableOpacity style={styles.submitBtn} onPress={submitCategory}>
+              <Text style={styles.submitText}>Əlavə et</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
+  safe: { flex: 1, backgroundColor: COLORS.background },
+  scroll: { padding: 20, paddingBottom: 120 },
+  hero: {
+    backgroundColor: COLORS.card,
+    borderRadius: 20,
+    padding: 20,
+    shadowColor: "#1F2933",
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 2,
   },
-  content: {
-    padding: 24,
-    paddingBottom: 80,
-    gap: 16,
-  },
-  title: {
-    fontSize: 24,
-  },
-  subtitle: {
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  segmented: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  segmentButton: {
-    flex: 1,
+  heroTitle: { fontSize: 22, fontWeight: "800", color: COLORS.text },
+  heroSub: { color: COLORS.muted, marginTop: 6 },
+  heroActions: { flexDirection: "row", marginTop: 18, gap: 12, flexWrap: "wrap" },
+  heroButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderRadius: 14,
+    paddingHorizontal: 16,
     paddingVertical: 10,
+  },
+  heroButtonPrimary: { backgroundColor: COLORS.primary },
+  heroButtonSecondary: { backgroundColor: COLORS.secondary },
+  heroButtonTextPrimary: { color: "#fff", fontWeight: "700" },
+  heroButtonTextSecondary: { color: COLORS.primary, fontWeight: "700" },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 28,
+  },
+  sectionTitle: { fontSize: 16, fontWeight: "700", color: COLORS.text },
+  sectionSub: { fontSize: 12, color: COLORS.muted, marginTop: 4 },
+  addChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    backgroundColor: "#E0EAFF",
+  },
+  addChipText: { color: COLORS.primary, fontWeight: "600" },
+  categoryGrid: { flexDirection: "row", flexWrap: "wrap", gap: 12, marginTop: 16 },
+  categoryCard: {
+    width: "48%",
+    backgroundColor: COLORS.card,
+    borderRadius: 18,
+    padding: 16,
+    shadowColor: "#0F172A",
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 1,
+  },
+  categoryHeader: { flexDirection: "row", alignItems: "center", gap: 10 },
+  categoryIcon: {
+    width: 36,
+    height: 36,
     borderRadius: 12,
-    alignItems: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
-  segmentText: {
-    fontSize: 15,
-    fontWeight: '600',
+  categoryTitle: { fontWeight: "700", color: COLORS.text },
+  categoryMeta: { marginTop: 8, color: COLORS.muted, fontSize: 12 },
+  progressTrack: {
+    marginTop: 10,
+    height: 6,
+    borderRadius: 999,
+    backgroundColor: COLORS.border,
   },
-  formGroup: {
+  progressFill: {
+    height: 6,
+    borderRadius: 999,
+    backgroundColor: COLORS.primary,
+  },
+  spacer: { height: 12 },
+  cardButton: {
+    marginTop: 12,
+    backgroundColor: COLORS.primary,
+    borderRadius: 12,
+    paddingVertical: 10,
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
     gap: 6,
   },
-  label: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  input: {
-    borderWidth: 1,
-    borderRadius: 12,
+  cardButtonText: { color: "#fff", fontWeight: "600" },
+  incomePillSection: { marginTop: 28 },
+  pill: {
     paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: "#E5E7EB",
+    marginRight: 10,
+  },
+  pillActive: { backgroundColor: COLORS.primary },
+  pillText: { color: COLORS.text, fontWeight: "600" },
+  pillTextActive: { color: "#fff" },
+  reminderCard: {
+    marginTop: 30,
+    backgroundColor: COLORS.card,
+    borderRadius: 20,
+    padding: 20,
+    shadowColor: "#1F2937",
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  reminderRow: {
+    flexDirection: "row",
+    alignItems: "center",
     paddingVertical: 10,
-    fontSize: 15,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: COLORS.border,
   },
-  toggleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 4,
+  reminderIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: COLORS.secondary,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
   },
-  helper: {
-    fontSize: 12,
+  reminderTitle: { fontWeight: "600", color: COLORS.text },
+  reminderMeta: { color: COLORS.muted, fontSize: 12, marginTop: 2 },
+  emptyText: { textAlign: "center", color: COLORS.muted, marginTop: 12 },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(15, 23, 42, 0.35)",
+    justifyContent: "flex-end",
+    padding: 16,
   },
-  submitButton: {
-    marginTop: 12,
-    paddingVertical: 14,
+  modalCard: {
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    padding: 20,
+  },
+  modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  modalTitle: { fontSize: 18, fontWeight: "700", color: COLORS.text },
+  modalLabel: { fontSize: 13, fontWeight: "600", color: COLORS.muted, marginTop: 8 },
+  input: {
+    marginTop: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    paddingHorizontal: 12,
+    height: 44,
+    color: COLORS.text,
+  },
+  dateRow: {
+    marginTop: 18,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  dateChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: COLORS.secondary,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+  },
+  dateChipText: { color: COLORS.text, fontWeight: "600" },
+  submitBtn: {
+    backgroundColor: COLORS.primary,
     borderRadius: 14,
-    alignItems: 'center',
+    paddingVertical: 14,
+    marginTop: 20,
+    alignItems: "center",
   },
-  submitText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+  submitText: { color: "#fff", fontWeight: "700", fontSize: 16 },
+  toggleRow: {
+    flexDirection: "row",
+    marginTop: 12,
+    gap: 10,
   },
-  errorText: {
-    color: '#ef4444',
-    fontSize: 13,
+  toggleChip: {
+    flex: 1,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    paddingVertical: 10,
+    alignItems: "center",
   },
+  toggleChipActive: { borderColor: COLORS.primary, backgroundColor: COLORS.secondary },
+  toggleChipText: { color: COLORS.muted, fontWeight: "600" },
+  toggleChipTextActive: { color: COLORS.primary },
+  reminderInfo: { marginTop: 14, fontSize: 12, color: COLORS.muted },
 });

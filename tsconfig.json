@@ -16,7 +16,8 @@
     "allowJs": false,
     "isolatedModules": true,
     "types": [
-      "react"
+      "react",
+      "expo-router"
     ]
   },
   "include": [

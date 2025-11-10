@@ -71,3 +71,33 @@ export async function removeRecurringNotificationId(recurringId: string) {
   await writeRecurringNotifyMap(map);
   return current;
 }
+// ----------------------
+// Universal JSON helpers for local app data (transactions, categories, reminders)
+// ----------------------
+const NS = (k: string) => `expensetracker_local:${k}`;
+
+export async function jset<T>(key: string, value: T) {
+  try {
+    await AsyncStorage.setItem(NS(key), JSON.stringify(value));
+  } catch (err) {
+    console.warn("Failed to save local data", err);
+  }
+}
+
+export async function jget<T>(key: string, fallback: T): Promise<T> {
+  try {
+    const raw = await AsyncStorage.getItem(NS(key));
+    if (!raw) return fallback;
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+export async function jremove(key: string) {
+  try {
+    await AsyncStorage.removeItem(NS(key));
+  } catch (err) {
+    console.warn("Failed to remove local data", err);
+  }
+}

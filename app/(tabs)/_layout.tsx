@@ -1,65 +1,99 @@
-import React from 'react';
-import { Tabs } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { useTheme } from '../../src/theme/ThemeProvider';
+import React from "react";
+import { Tabs } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import { View, StyleSheet } from "react-native";
+import { useTheme } from "../../src/theme/ThemeProvider";
+
+const ACTIVE_COLOR = "rgba(37,99,235,0.9)";
+const INACTIVE_COLOR = "rgba(156,163,175,0.7)";
+
+const ICONS: Record<string, { active: keyof typeof Ionicons.glyphMap; inactive: keyof typeof Ionicons.glyphMap }> = {
+  home: { active: "home", inactive: "home-outline" },
+  stats: { active: "stats-chart", inactive: "stats-chart-outline" },
+  transactions: { active: "swap-horizontal", inactive: "swap-horizontal-outline" },
+  more: { active: "apps", inactive: "apps-outline" },
+};
 
 export default function TabsLayout() {
-  const { colors, fonts } = useTheme();
+  const { fonts } = useTheme();
 
   return (
     <Tabs
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.textMuted,
+        tabBarShowLabel: true,
+        tabBarActiveTintColor: ACTIVE_COLOR,
+        tabBarInactiveTintColor: INACTIVE_COLOR,
         tabBarStyle: {
-          backgroundColor: colors.card,
-          borderTopColor: 'rgba(255,255,255,0.08)',
-          paddingTop: 8,
-          paddingBottom: 12,
-          height: 70,
+          backgroundColor: "rgba(249,250,251,0.95)",
+          borderTopWidth: 0,
+          borderTopColor: "rgba(229,231,235,0.6)",
+          paddingBottom: 10,
+          paddingTop: 6,
+          height: 74,
+          shadowColor: "rgba(0,0,0,0.06)",
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: 1,
+          shadowRadius: 12,
+          elevation: 12,
         },
+        tabBarItemStyle: styles.tabBarItem,
         tabBarLabelStyle: {
           fontSize: 12,
+          marginTop: 2,
+          fontWeight: "500",
+          textAlign: "center",
+          flexWrap: "nowrap",
+          includeFontPadding: false,
           fontFamily: fonts.body,
         },
-        tabBarIcon: ({ color, size, focused }) => {
-          const icons: Record<string, { active: keyof typeof Ionicons.glyphMap; inactive: keyof typeof Ionicons.glyphMap }> = {
-            home: { active: 'home', inactive: 'home-outline' },
-            stats: { active: 'stats-chart', inactive: 'stats-chart-outline' },
-            transactions: { active: 'swap-horizontal', inactive: 'swap-horizontal-outline' },
-            more: { active: 'apps', inactive: 'apps-outline' },
-          };
-          const iconSet = icons[route.name] ?? icons.home;
-          const iconName = focused ? iconSet.active : iconSet.inactive;
-          return <Ionicons name={iconName} color={color} size={size} />;
-        },
+        tabBarIcon: ({ color, focused }) => (
+          <TabIcon
+            iconName={(focused ? ICONS[route.name]?.active : ICONS[route.name]?.inactive) ?? "ellipse"}
+            color={color}
+            focused={focused}
+          />
+        ),
       })}
     >
-      <Tabs.Screen
-        name="home"
-        options={{
-          title: 'Əsas',
-        }}
-      />
-      <Tabs.Screen
-        name="stats"
-        options={{
-          title: 'Statistika',
-        }}
-      />
-      <Tabs.Screen
-        name="transactions"
-        options={{
-          title: 'Əməliyyatlar',
-        }}
-      />
-      <Tabs.Screen
-        name="more"
-        options={{
-          title: 'Daha çox',
-        }}
-      />
+      <Tabs.Screen name="home" options={{ title: "Home" }} />
+      <Tabs.Screen name="stats" options={{ title: "Statistics" }} />
+      <Tabs.Screen name="transactions" options={{ title: "Transactions" }} />
+      <Tabs.Screen name="more" options={{ title: "More" }} />
     </Tabs>
   );
 }
+
+function TabIcon({
+  iconName,
+  color,
+  focused,
+}: {
+  iconName: keyof typeof Ionicons.glyphMap;
+  color: string;
+  focused: boolean;
+}) {
+  return (
+    <View style={styles.iconWrapper}>
+      <Ionicons name={iconName} size={22} color={color} />
+      <View style={[styles.indicator, focused && styles.indicatorActive]} />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  tabBarItem: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  iconWrapper: { alignItems: "center", justifyContent: "center" },
+  indicator: {
+    width: 26,
+    height: 2,
+    borderRadius: 999,
+    marginTop: 4,
+    backgroundColor: "transparent",
+  },
+  indicatorActive: { backgroundColor: ACTIVE_COLOR },
+});
