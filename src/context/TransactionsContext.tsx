@@ -124,7 +124,8 @@ const TransactionsContext = createContext<TransactionsContextValue>({
 // === Local keys ===
 const CKEY = "categories:v1";
 const RKEY = "reminders:v1";
-const TKEY = "transactions_cache:v1";
+const TKEY = "transactions:v1";
+
 
 // === Provider ===
 export const TransactionsProvider = ({ children }: { children: React.ReactNode }) => {
@@ -161,6 +162,23 @@ export const TransactionsProvider = ({ children }: { children: React.ReactNode }
       }
     })();
   }, []);
+  // === Migration from old key (for recovering lost data) ===
+useEffect(() => {
+  (async () => {
+    try {
+      const oldData = await jget("transactions_cache:v1", []);
+      const currentData = await jget("transactions:v1", []);
+      if (!currentData.length && oldData.length) {
+        await jset("transactions:v1", oldData);
+        setTransactions(oldData);
+        console.log("✅ Köhnə əməliyyatlar bərpa olundu (migrasiya tamamlandı).");
+      }
+    } catch (err) {
+      console.warn("Migration error:", err);
+    }
+  })();
+}, []);
+
 
   // === Toast helper ===
   const showToast = (msg: string) => {

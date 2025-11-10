@@ -27,7 +27,6 @@ export default function MoreScreen() {
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: "#F4F6F9" }]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 60 }}>
-        <Text style={[styles.header, { color: colors.text }]}>Profil</Text>
 
         <View style={styles.profileRow}>
           <Image source={{ uri: "https://i.pravatar.cc/150?img=7" }} style={styles.avatar} />
