@@ -1,12 +1,16 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, Alert } from "react-native";
+import { View, Text, TextInput, TouchableOpacity, Alert, StyleSheet } from "react-native";
 import { Stack } from "expo-router";
 import { getItem, setItem } from "@/src/lib/storage";
 
 type Profile = { firstName: string; lastName: string; phone: string };
 
 export default function Info() {
-  const [data, setData] = useState<Profile>({ firstName: "Məmməd", lastName: "Əhmədli", phone: "+994102284679" });
+  const [data, setData] = useState<Profile>({
+    firstName: "Məmməd",
+    lastName: "Əhmədli",
+    phone: "+994102284679",
+  });
 
   useEffect(() => {
     (async () => {
@@ -17,33 +21,62 @@ export default function Info() {
 
   async function save() {
     await setItem("profile", data);
-    // TODO: backend-ə POST/PUT göndər (əgər server var)
-    Alert.alert("Uğurlu", "Məlumatlar yadda saxlanıldı.");
+    Alert.alert("✅ Uğurlu", "Məlumatlar yadda saxlanıldı.");
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#F4F6F9", padding: 20 }}>
+    <View style={styles.container}>
       <Stack.Screen options={{ title: "Məlumatlarım" }} />
-      <Field label="Ad" value={data.firstName} onChange={(v) => setData({ ...data, firstName: v })} />
-      <Field label="Soyad" value={data.lastName} onChange={(v) => setData({ ...data, lastName: v })} />
-      <Field label="Nömrə" value={data.phone} onChange={(v) => setData({ ...data, phone: v })} keyboardType="phone-pad" />
-      <TouchableOpacity style={{ backgroundColor: "#2563EB", padding: 14, borderRadius: 12, alignItems: "center", marginTop: 6 }} onPress={save}>
-        <Text style={{ color: "#fff", fontWeight: "700" }}>Yadda saxla</Text>
-      </TouchableOpacity>
+      <View style={styles.inner}>
+        <Field label="Ad" value={data.firstName} onChange={(v) => setData({ ...data, firstName: v })} />
+        <Field label="Soyad" value={data.lastName} onChange={(v) => setData({ ...data, lastName: v })} />
+        <Field
+          label="Nömrə"
+          value={data.phone}
+          onChange={(v) => setData({ ...data, phone: v })}
+          keyboardType="phone-pad"
+        />
+        <TouchableOpacity style={styles.saveBtn} onPress={save}>
+          <Text style={styles.saveText}>Yadda saxla</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
 
 function Field({ label, value, onChange, keyboardType }: any) {
   return (
-    <View style={{ marginBottom: 12 }}>
-      <Text style={{ color: "#0F172A", marginBottom: 6, fontWeight: "700" }}>{label}</Text>
+    <View style={{ marginBottom: 15, width: "100%" }}>
+      <Text style={styles.label}>{label}</Text>
       <TextInput
         value={value}
         onChangeText={onChange}
         keyboardType={keyboardType}
-        style={{ backgroundColor: "#FFFFFF", borderColor: "#E9EEF5", borderWidth: 1, borderRadius: 12, padding: 12, color: "#0F172A" }}
+        style={styles.input}
       />
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: "#F4F6F9", alignItems: "center", justifyContent: "center" },
+  inner: { width: "85%", backgroundColor: "#fff", padding: 20, borderRadius: 16, elevation: 3 },
+  label: { color: "#0F172A", marginBottom: 6, fontWeight: "700" },
+  input: {
+    backgroundColor: "#F9FAFB",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 10,
+    padding: 12,
+    fontSize: 15,
+    color: "#111827",
+  },
+  saveBtn: {
+    backgroundColor: "#2563EB",
+    paddingVertical: 14,
+    borderRadius: 10,
+    alignItems: "center",
+    marginTop: 6,
+  },
+  saveText: { color: "#fff", fontWeight: "700", fontSize: 15 },
+});

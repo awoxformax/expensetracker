@@ -67,14 +67,14 @@ export default function HomeScreen() {
     }
   }, [loadTransactions, currentMonthKey, token]);
 
-  const incomes = transactions.filter((t) => t.type === "income");
-  const expenses = transactions.filter((t) => t.type === "expense");
+  const incomes = (transactions ?? []).filter((t) => t.type === "income");
+  const expenses = (transactions ?? []).filter((t) => t.type === "expense");
   const totalIncome = incomes.reduce((sum, t) => sum + t.amount, 0);
   const totalExpense = expenses.reduce((sum, t) => sum + t.amount, 0);
   const balance = totalIncome - totalExpense;
 
   const fullName =
-    [state.profile.firstName, state.profile.lastName].filter(Boolean).join(" ") || "Ehmedli";
+     [state?.profile?.firstName, state?.profile?.lastName].filter(Boolean).join(" ") || "Ehmedli";
   const friendlyName = fullName.split(" ")[0] || fullName;
   const initials = fullName
     .split(" ")
@@ -83,13 +83,15 @@ export default function HomeScreen() {
     .slice(0, 2)
     .toUpperCase() || "E";
 
-  const recentTransactions = useMemo(
-    () =>
-      [...transactions]
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-        .slice(0, 5),
-    [transactions]
-  );
+const recentTransactions = useMemo(() => {
+  const safeTransactions = Array.isArray(transactions) ? transactions : [];
+  return safeTransactions
+    .slice()
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    .slice(0, 5);
+}, [transactions]);
+
+
 
   const transactionAnimations = useRef<Animated.Value[]>([]);
   const pulseAnim = useRef(new Animated.Value(0)).current;
