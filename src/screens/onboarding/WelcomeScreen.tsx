@@ -17,7 +17,7 @@ export default function WelcomeScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
         <View style={styles.inner}>
-          <Text style={[styles.title, { fontFamily: fonts.heading }]}>Expense Tracker</Text>
+          <Text style={[styles.title, { fontFamily: fonts.bold }]}>Expense Tracker</Text>
           <Text style={[styles.subtitle, { fontFamily: fonts.body }]}>Başlamaq üçün yeni hesab yarat və ya daxil ol.</Text>
         </View>
         <View style={styles.actions}>

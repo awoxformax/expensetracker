@@ -6,7 +6,7 @@ import { useTheme } from "../../src/theme/ThemeProvider";
 import { useLang } from "../../src/context/LangContext";
 import { t } from "../../src/data/strings";
 
-const ACTIVE_COLOR = "rgba(37,99,235,0.9)";
+const ACTIVE_COLOR = "rgba(37,99,235,0.95)";
 const INACTIVE_COLOR = "rgba(156,163,175,0.7)";
 
 const ICONS: Record<
@@ -20,29 +20,21 @@ const ICONS: Record<
 };
 
 export default function TabsLayout() {
-  const { fonts } = useTheme();
+  const { fonts, isDark } = useTheme();
   const { lang } = useLang();
 
   return (
     <Tabs
+      key={lang} // dil dəyişəndə tam re-render olur
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarShowLabel: true,
         tabBarActiveTintColor: ACTIVE_COLOR,
         tabBarInactiveTintColor: INACTIVE_COLOR,
-        tabBarStyle: {
-          backgroundColor: "rgba(249,250,251,0.95)",
-          borderTopWidth: 0,
-          borderTopColor: "rgba(229,231,235,0.6)",
-          paddingBottom: 10,
-          paddingTop: 6,
-          height: 74,
-          shadowColor: "rgba(0,0,0,0.06)",
-          shadowOffset: { width: 0, height: -2 },
-          shadowOpacity: 1,
-          shadowRadius: 12,
-          elevation: 12,
-        },
+        tabBarStyle: [
+          styles.tabBar,
+          { backgroundColor: isDark ? "#111827" : "rgba(249,250,251,0.97)" },
+        ],
         tabBarItemStyle: styles.tabBarItem,
         tabBarLabelStyle: {
           fontSize: 12,
@@ -92,6 +84,18 @@ function TabIcon({
 }
 
 const styles = StyleSheet.create({
+  tabBar: {
+    borderTopWidth: 0,
+    borderTopColor: "transparent",
+    paddingBottom: 10,
+    paddingTop: 6,
+    height: 74,
+    shadowColor: "rgba(0,0,0,0.06)",
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 1,
+    shadowRadius: 12,
+    elevation: 12,
+  },
   tabBarItem: {
     flex: 1,
     alignItems: "center",

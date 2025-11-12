@@ -260,7 +260,7 @@ return (
     </View>
 
     <View style={styles.headerActions}>
-      <TouchableOpacity style={styles.circleIcon} onPress={() => router.push("/(tabs)/more")}>
+      <TouchableOpacity style={styles.circleIcon} onPress={() => router.push("../tabs/more")}>
         <Ionicons name="qr-code-outline" size={18} color="#E5E7FF" />
       </TouchableOpacity>
       <TouchableOpacity style={styles.circleIcon} onPress={() => router.push("/notifications" as any)}>
