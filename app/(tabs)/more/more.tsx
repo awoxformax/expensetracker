@@ -9,16 +9,22 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useTheme } from "../../../src/theme/ThemeProvider";
-import { useLang } from "../../../src/context/LangContext";
-import { useAuth } from "../../../src/context/AuthContext";
-import { t } from "../../../src/data/strings";
+import { useTheme } from "@/src/theme/ThemeProvider";
+import { useLang } from "@/src/context/LangContext";
+import { useAuth } from "@/src/context/AuthContext";
+import { useUser } from "@/src/context/UserContext";
+import { t } from "@/src/data/strings";
 
 export default function MoreScreen() {
   const { colors, isDark, toggleTheme } = useTheme();
   const { lang } = useLang();
   const { logout } = useAuth();
+  const { state } = useUser();
   const router = useRouter();
+  const fullName =
+    [state.profile.firstName, state.profile.lastName].filter(Boolean).join(" ").trim() ||
+    "Profil";
+  const phoneNumber = state.profile.phone || "+000000000";
 
   return (
     <ScrollView
@@ -30,10 +36,10 @@ export default function MoreScreen() {
     >
       {/* Profil */}
       <View style={styles.profileBox}>
-        <TouchableOpacity onPress={() => router.push("/more/edit-info")}>
-          <Text style={[styles.name, { color: colors.text }]}>Məmməd Əhmədli</Text>
+        <TouchableOpacity onPress={() => router.push("/edit-info")}>
+          <Text style={[styles.name, { color: colors.text }]}>{fullName}</Text>
           <Text style={[styles.phone, { color: colors.subtext }]}>
-            +994102284679
+            {phoneNumber}
           </Text>
         </TouchableOpacity>
 

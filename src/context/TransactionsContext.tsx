@@ -75,12 +75,22 @@ export type Reminder = {
   atHour?: number;
 };
 
+export type CategoryLimit = {
+  _id: string;
+  category: string;
+  monthlyLimit: number;
+  spent?: number;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
 type ApiResponse<T> = { ok: boolean; data?: T; error?: string };
 
 type TransactionsContextValue = {
   transactions: Transaction[];
   categories: Category[];
   reminders: Reminder[];
+  categoryLimits: CategoryLimit[];
 
   loading: boolean;
   error: string | null;
@@ -94,6 +104,7 @@ type TransactionsContextValue = {
   addCategory: (name: string, type: "income" | "expense", limit?: number) => Promise<void>;
   removeCategory: (id: string) => Promise<void>;
   refreshLocalDerived: () => void;
+  refreshLimits: () => Promise<CategoryLimit[]>;
 
   addReminder: (r: Reminder) => Promise<void>;
   removeReminder: (id: string) => Promise<void>;
@@ -104,6 +115,7 @@ const TransactionsContext = createContext<TransactionsContextValue>({
   transactions: [],
   categories: [],
   reminders: [],
+  categoryLimits: [],
   loading: false,
   error: null,
   currentMonth: null,
@@ -116,6 +128,7 @@ const TransactionsContext = createContext<TransactionsContextValue>({
   addCategory: async () => {},
   removeCategory: async () => {},
   refreshLocalDerived: () => {},
+  refreshLimits: async () => [],
 
   addReminder: async () => {},
   removeReminder: async () => {},
@@ -134,6 +147,7 @@ export const TransactionsProvider = ({ children }: { children: React.ReactNode }
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [customCategories, setCustomCategories] = useState<Category[]>([]);
   const [reminders, setReminders] = useState<Reminder[]>([]);
+  const [categoryLimits, setCategoryLimits] = useState<CategoryLimit[]>([]);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -203,6 +217,18 @@ useEffect(() => {
     },
     [token]
   );
+
+  const refreshLimits = useCallback(async () => {
+    const response = await authedRequest<CategoryLimit[]>("/api/settings/limits", {
+      method: "GET",
+    });
+    if (!response.ok) {
+      throw new Error(response.error || "Limitləri yükləmək mümkün olmadı");
+    }
+    const data = response.data || [];
+    setCategoryLimits(data);
+    return data;
+  }, [authedRequest]);
 
   // === CRUD operations ===
   const loadTransactions = useCallback(
@@ -384,6 +410,7 @@ useEffect(() => {
       transactions,
       categories,
       reminders,
+      categoryLimits,
       loading,
       error,
       currentMonth,
@@ -394,10 +421,11 @@ useEffect(() => {
       addCategory,
       removeCategory,
       refreshLocalDerived,
+      refreshLimits,
       addReminder,
       removeReminder,
     }),
-    [transactions, categories, reminders, loading, error, currentMonth]
+    [transactions, categories, reminders, categoryLimits, loading, error, currentMonth, refreshLimits]
   );
 
   return (

@@ -14,11 +14,11 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useTheme } from '../../src/theme/ThemeProvider';
-import { useUser } from '../../src/context/UserContext';
-import { useAuth } from '../../src/context/AuthContext';
-import { API_BASE_URL } from '../../src/lib/config';
-import { CategoryLimit, useTransactions } from '../../src/context/TransactionsContext';
+import { useTheme } from '@/src/theme/ThemeProvider';
+import { useUser } from '@/src/context/UserContext';
+import { useAuth } from '@/src/context/AuthContext';
+import { API_BASE_URL } from '@/src/lib/config';
+import { CategoryLimit, useTransactions } from '@/src/context/TransactionsContext';
 
 const showToast = (message: string) => {
   if (Platform.OS === 'android') {
@@ -336,4 +336,3 @@ const styles = StyleSheet.create({
     backgroundColor: '#ef44440a',
   },
 });
-

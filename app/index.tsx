@@ -6,6 +6,7 @@ import { useTheme } from '../src/theme/ThemeProvider';
 import { useOnboarding } from '../src/context/Onboarding';
 import { ONBOARDING_DONE_KEY } from '../src/constants/storage';
 import { getToken } from '../src/lib/storage';
+import { apiGetProfile } from '../src/lib/api';
 import 'react-native-reanimated';
 
 
@@ -27,6 +28,13 @@ export default function Index() {
       const flag = await AsyncStorage.getItem(ONBOARDING_DONE_KEY);
       if (!isActive) return;
       if (flag) {
+        router.replace('/(tabs)/home');
+        return;
+      }
+      const remote = await apiGetProfile(token);
+      if (!isActive) return;
+      if (remote.ok && remote.data?.onboardingCompleted) {
+        await AsyncStorage.setItem(ONBOARDING_DONE_KEY, 'true');
         router.replace('/(tabs)/home');
       } else {
         reset();

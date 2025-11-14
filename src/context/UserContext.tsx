@@ -6,11 +6,24 @@ import React, {
   useMemo,
   useState,
 } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getUserState, saveUserState } from "../lib/storage";
+import { useAuth } from "./AuthContext";
+import {
+  apiGetProfile,
+  apiUpdateProfile,
+  RemoteCategoryPayload,
+  UserProfileResponse,
+  UserProfileUpdatePayload,
+} from "../lib/api";
+import { ONBOARDING_DONE_KEY } from "../constants/storage";
 
 // === Type definitions ===
 export type Persona = "student" | "worker" | "family";
 export type IncomeType = "salary" | "scholarship" | "freelancer" | "additional";
+
+const PERSONA_VALUES: Persona[] = ["student", "worker", "family"];
+const INCOME_VALUES: IncomeType[] = ["salary", "scholarship", "freelancer", "additional"];
 
 export type Category = {
   id: string;
@@ -18,6 +31,7 @@ export type Category = {
   description?: string;
   period?: "daily" | "monthly";
   icon?: string;
+  type?: "income" | "expense";
 };
 
 export type Transaction = {
@@ -47,6 +61,20 @@ export type UserState = {
   profileCompleted?: boolean;
 };
 
+const mapRemoteCategories = (list?: RemoteCategoryPayload[]): Category[] => {
+  if (!Array.isArray(list)) return [];
+  return list
+    .map((cat) => ({
+      id: cat.id || `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      name: cat.name || "",
+      description: cat.description,
+      period: cat.period,
+      icon: cat.icon,
+      type: cat.type as Category["type"],
+    }))
+    .filter((cat) => cat.id && cat.name);
+};
+
 const createDefaultState = (): UserState => ({
   profile: {},
   categories: [],
@@ -57,7 +85,6 @@ const defaultState: UserState = createDefaultState();
 
 export type UserContextType = {
   state: UserState;
-  setState: React.Dispatch<React.SetStateAction<UserState>>; // ✅ əlavə olundu
   loading: boolean;
 
   setPersona: (p: Persona) => void;
@@ -78,7 +105,6 @@ export type UserContextType = {
 // === Default Context ===
 const UserContext = createContext<UserContextType>({
   state: defaultState,
-  setState: () => {},
   loading: true,
 
   setPersona: () => {},
@@ -100,6 +126,7 @@ const UserContext = createContext<UserContextType>({
 export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const [state, setState] = useState<UserState>(createDefaultState());
   const [loading, setLoading] = useState(true);
+  const { token } = useAuth();
 
   // Load from storage
   useEffect(() => {
@@ -119,56 +146,142 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     });
   }, []);
 
+  const applyRemoteProfile = useCallback(
+    (payload?: UserProfileResponse["data"]) => {
+      if (!payload) return;
+      persist((prev) => ({
+        ...prev,
+        profile: {
+          ...prev.profile,
+          firstName: payload.firstName ?? prev.profile.firstName,
+          lastName: payload.lastName ?? prev.profile.lastName,
+          phone: payload.phone ?? prev.profile.phone,
+          persona:
+            payload.persona && PERSONA_VALUES.includes(payload.persona as Persona)
+              ? (payload.persona as Persona)
+              : prev.profile.persona,
+          incomeType:
+            payload.incomeType && INCOME_VALUES.includes(payload.incomeType as IncomeType)
+              ? (payload.incomeType as IncomeType)
+              : prev.profile.incomeType,
+        },
+        categories: payload.categories ? mapRemoteCategories(payload.categories) : prev.categories,
+        budget: payload.budget != null ? payload.budget : prev.budget,
+        onboardingPhase1Done:
+          payload.onboardingCompleted ?? prev.onboardingPhase1Done,
+      }));
+    },
+    [persist]
+  );
+
+  useEffect(() => {
+    if (!token) {
+      const fresh = createDefaultState();
+      setState(fresh);
+      saveUserState(fresh);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const response = await apiGetProfile(token);
+        if (!response.ok || cancelled) return;
+        applyRemoteProfile(response.data);
+        if (response.data?.onboardingCompleted) {
+          await AsyncStorage.setItem(ONBOARDING_DONE_KEY, "true");
+        }
+      } catch (err) {
+        console.warn("Failed to load profile", err);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [token, applyRemoteProfile]);
+
+  const pushProfileUpdate = useCallback(
+    async (payload: UserProfileUpdatePayload) => {
+      if (!token) return;
+      try {
+        await apiUpdateProfile(token, payload);
+      } catch (err) {
+        console.warn("Profile sync failed", err);
+      }
+    },
+    [token]
+  );
+
   // === Update methods ===
   const setPersona = useCallback(
-    (p: Persona) => persist((prev) => ({ ...prev, profile: { ...prev.profile, persona: p } })),
-    [persist]
+    (p: Persona) => {
+      persist((prev) => ({ ...prev, profile: { ...prev.profile, persona: p } }));
+      pushProfileUpdate({ persona: p });
+    },
+    [persist, pushProfileUpdate]
   );
 
   const setIncomeType = useCallback(
-    (i: IncomeType) =>
-      persist((prev) => ({ ...prev, profile: { ...prev.profile, incomeType: i } })),
-    [persist]
+    (i: IncomeType) => {
+      persist((prev) => ({ ...prev, profile: { ...prev.profile, incomeType: i } }));
+      pushProfileUpdate({ incomeType: i });
+    },
+    [persist, pushProfileUpdate]
   );
 
   const setCategories = useCallback(
-    (cats: Category[]) => persist((prev) => ({ ...prev, categories: cats })),
-    [persist]
+    (cats: Category[]) => {
+      persist((prev) => ({ ...prev, categories: cats }));
+      pushProfileUpdate({ categories: cats });
+    },
+    [persist, pushProfileUpdate]
   );
 
   const addCategory = useCallback(
     (cat: Omit<Category, "id">) => {
       const id = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-      persist((prev) => ({ ...prev, categories: [...prev.categories, { id, ...cat }] }));
+      let snapshot: Category[] = [];
+      persist((prev) => {
+        snapshot = [...prev.categories, { id, ...cat }];
+        return { ...prev, categories: snapshot };
+      });
+      pushProfileUpdate({ categories: snapshot });
     },
-    [persist]
+    [persist, pushProfileUpdate]
   );
 
   const removeCategory = useCallback(
-    (id: string) =>
-      persist((prev) => ({
-        ...prev,
-        categories: prev.categories.filter((c) => c.id !== id),
-      })),
-    [persist]
+    (id: string) => {
+      let snapshot: Category[] = [];
+      persist((prev) => {
+        snapshot = prev.categories.filter((c) => c.id !== id);
+        return { ...prev, categories: snapshot };
+      });
+      pushProfileUpdate({ categories: snapshot });
+    },
+    [persist, pushProfileUpdate]
   );
 
   const updateCategory = useCallback(
-    (id: string, patch: Partial<Omit<Category, "id">>) =>
-      persist((prev) => ({
-        ...prev,
-        categories: prev.categories.map((c) => (c.id === id ? { ...c, ...patch } : c)),
-      })),
-    [persist]
+    (id: string, patch: Partial<Omit<Category, "id">>) => {
+      let snapshot: Category[] = [];
+      persist((prev) => {
+        snapshot = prev.categories.map((c) => (c.id === id ? { ...c, ...patch } : c));
+        return { ...prev, categories: snapshot };
+      });
+      pushProfileUpdate({ categories: snapshot });
+    },
+    [persist, pushProfileUpdate]
   );
 
   const setName = useCallback(
-    (firstName: string, lastName: string) =>
+    (firstName: string, lastName: string) => {
       persist((prev) => ({
         ...prev,
         profile: { ...prev.profile, firstName, lastName },
-      })),
-    [persist]
+      }));
+      pushProfileUpdate({ firstName, lastName });
+    },
+    [persist, pushProfileUpdate]
   );
 
   const setBirthDate = useCallback(
@@ -181,23 +294,29 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   );
 
   const setPhone = useCallback(
-    (phone: string) =>
+    (phone: string) => {
       persist((prev) => ({
         ...prev,
         profile: { ...prev.profile, phone },
-      })),
-    [persist]
+      }));
+      pushProfileUpdate({ phone });
+    },
+    [persist, pushProfileUpdate]
   );
 
   const setBudget = useCallback(
-    (budget: number) => persist((prev) => ({ ...prev, budget })),
-    [persist]
+    (budget: number) => {
+      persist((prev) => ({ ...prev, budget }));
+      pushProfileUpdate({ budget });
+    },
+    [persist, pushProfileUpdate]
   );
 
-  const completePhase1 = useCallback(
-    () => persist((prev) => ({ ...prev, onboardingPhase1Done: true })),
-    [persist]
-  );
+  const completePhase1 = useCallback(() => {
+    persist((prev) => ({ ...prev, onboardingPhase1Done: true }));
+    pushProfileUpdate({ onboardingCompleted: true });
+    AsyncStorage.setItem(ONBOARDING_DONE_KEY, "true").catch(() => {});
+  }, [persist, pushProfileUpdate]);
 
   const completeProfile = useCallback(
     () => persist((prev) => ({ ...prev, profileCompleted: true })),
@@ -214,7 +333,6 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const value = useMemo(
     () => ({
       state,
-      setState, // ✅ əlavə edildi
       loading,
       setPersona,
       setIncomeType,

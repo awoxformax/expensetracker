@@ -2,45 +2,27 @@ import React, { useState, useEffect } from "react";
 import { View, Text, TextInput, TouchableOpacity, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useTheme } from "../../../src/theme/ThemeProvider";
-import { useUser } from "../../../src/context/UserContext";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useTheme } from "@/src/theme/ThemeProvider";
+import { useUser } from "@/src/context/UserContext";
 
 export default function EditInfoScreen() {
   const router = useRouter();
   const { colors } = useTheme();
-  const { state, setState } = useUser();
+  const { state, setName, setPhone } = useUser();
 
   const [firstName, setFirstName] = useState(state.profile.firstName || "");
   const [lastName, setLastName] = useState(state.profile.lastName || "");
-  const [phone, setPhone] = useState(state.profile.phone || "");
+  const [phone, setPhoneLocal] = useState(state.profile.phone || "");
 
-  // === Local storage ilə sinxron saxla
   useEffect(() => {
-    (async () => {
-      try {
-        const saved = await AsyncStorage.getItem("user_profile");
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          setFirstName(parsed.firstName || "");
-          setLastName(parsed.lastName || "");
-          setPhone(parsed.phone || "");
-        }
-      } catch (err) {
-        console.warn("Profil məlumatı oxunmadı:", err);
-      }
-    })();
-  }, []);
+    setFirstName(state.profile.firstName || "");
+    setLastName(state.profile.lastName || "");
+    setPhoneLocal(state.profile.phone || "");
+  }, [state.profile.firstName, state.profile.lastName, state.profile.phone]);
 
-  const saveInfo = async () => {
-    const updated = {
-      ...state.profile,
-      firstName,
-      lastName,
-      phone,
-    };
-    setState((prev) => ({ ...prev, profile: updated }));
-    await AsyncStorage.setItem("user_profile", JSON.stringify(updated));
+  const saveInfo = () => {
+    setName(firstName.trim(), lastName.trim());
+    setPhone(phone.trim());
     router.back();
   };
 
@@ -76,7 +58,7 @@ export default function EditInfoScreen() {
         <TextInput
           style={[styles.input, { color: colors.text, borderColor: colors.border }]}
           value={phone}
-          onChangeText={setPhone}
+          onChangeText={setPhoneLocal}
           placeholder="+994..."
           keyboardType="phone-pad"
           placeholderTextColor={colors.subtext}

@@ -1,8 +1,9 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { Alert } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiLogin, apiSignup } from '../lib/api';
-import { clearToken, getToken, saveToken } from '../lib/storage';
-import { useUser } from './UserContext';
+import { clearToken, clearUserState, getToken, saveToken } from '../lib/storage';
+import { ONBOARDING_DONE_KEY } from '../constants/storage';
 
 type AuthContextType = {
   isAuthenticated: boolean;
@@ -23,7 +24,6 @@ const AuthContext = createContext<AuthContextType>({
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [token, setToken] = useState<string | null>(null);
   const [initializing, setInitializing] = useState(true);
-  const { reset } = useUser();
 
   useEffect(() => {
     const init = async () => {
@@ -48,7 +48,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         Alert.alert('Xəta', res.error || 'Giriş mümkün olmadı');
         return false;
       }
-      reset();
       await saveToken(res.token);
       setToken(res.token);
       return true;
@@ -56,7 +55,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       Alert.alert('Xəta', 'Serverə qoşulmaq mümkün olmadı');
       return false;
     }
-  }, [reset]);
+  }, []);
 
   const signup = useCallback(async (email: string, password: string) => {
     if (!email || !password) {
@@ -69,7 +68,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         Alert.alert('Xəta', res.error || 'Qeydiyyat mümkün olmadı');
         return false;
       }
-      reset();
       await saveToken(res.token);
       setToken(res.token);
       return true;
@@ -77,13 +75,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       Alert.alert('Xəta', 'Serverə qoşulmaq mümkün olmadı');
       return false;
     }
-  }, [reset]);
+  }, []);
 
   const logout = useCallback(() => {
     clearToken();
-    reset();
+    clearUserState();
+    AsyncStorage.removeItem(ONBOARDING_DONE_KEY).catch(() => {});
     setToken(null);
-  }, [reset]);
+  }, []);
 
   const value = useMemo(
     () => ({
