@@ -47,14 +47,14 @@ router.post("/signup", async (req, res) => {
     if (!email || !password) {
       return res
         .status(400)
-        .json({ ok: false, error: "Email v�T �Yifr�T t�Tl�Tb olunur" });
+        .json({ ok: false, error: "Email və şifrə tələb olunur" });
     }
 
     const existing = await User.findOne({ email });
     if (existing) {
       return res
         .status(409)
-        .json({ ok: false, error: "Bu email art��q qeydiyyatdad��r" });
+        .json({ ok: false, error: "Bu email artıq qeydiyyatdadır" });
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
@@ -63,7 +63,7 @@ router.post("/signup", async (req, res) => {
     return res.status(201).json(authPayload);
   } catch (err) {
     console.error("Signup error:", err);
-    return res.status(500).json({ ok: false, error: "Server x�Ttas��" });
+    return res.status(500).json({ ok: false, error: "Server xətası" });
   }
 });
 
@@ -74,28 +74,28 @@ router.post("/login", async (req, res) => {
     if (!email || !password) {
       return res
         .status(400)
-        .json({ ok: false, error: "Email v�T �Yifr�T t�Tl�Tb olunur" });
+        .json({ ok: false, error: "Email və şifrə tələb olunur" });
     }
 
     const user = await User.findOne({ email });
     if (!user) {
       return res
         .status(401)
-        .json({ ok: false, error: "Yanl��Y email v�T ya �Yifr�T" });
+        .json({ ok: false, error: "Yanlış email və ya şifrə" });
     }
 
     const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) {
       return res
         .status(401)
-        .json({ ok: false, error: "Yanl��Y email v�T ya �Yifr�T" });
+        .json({ ok: false, error: "Yanlış email və ya şifrə" });
     }
 
     const authPayload = await buildAuthResponse(user);
     return res.json(authPayload);
   } catch (err) {
     console.error("Login error:", err);
-    return res.status(500).json({ ok: false, error: "Server x�Ttas��" });
+    return res.status(500).json({ ok: false, error: "Server xətası" });
   }
 });
 
@@ -105,7 +105,7 @@ router.post("/refresh", async (req, res) => {
     if (!refreshToken) {
       return res
         .status(400)
-        .json({ ok: false, error: "Refresh token laz��md��r" });
+        .json({ ok: false, error: "Refresh token lazımlıdır" });
     }
 
     const hashed = hashRefreshToken(refreshToken);
@@ -118,14 +118,14 @@ router.post("/refresh", async (req, res) => {
     if (!user) {
       return res
         .status(401)
-        .json({ ok: false, error: "Refresh token etibars��zd��r" });
+        .json({ ok: false, error: "Refresh token etibarsızdır" });
     }
 
     const authPayload = await buildAuthResponse(user);
     return res.json(authPayload);
   } catch (err) {
     console.error("Refresh token error:", err);
-    return res.status(500).json({ ok: false, error: "Server x�Ttas��" });
+    return res.status(500).json({ ok: false, error: "Server xətası" });
   }
 });
 

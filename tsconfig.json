@@ -37,8 +37,6 @@
     "app",
     "App.tsx",
     ".expo/types",
-    "expo-env.d.ts",
-    ".expo/types/**/*.ts",
     "svg.d.ts"
   ],
   "exclude": [
