@@ -1,8 +1,9 @@
-import { API_BASE_URL } from './config';
+import { http } from "./http";
 
 type AuthResponse = {
   ok: boolean;
   token?: string;
+  refreshToken?: string;
   user?: { id: string; email: string };
   error?: string;
 };
@@ -42,49 +43,30 @@ export type UserProfileUpdatePayload = {
   categories?: RemoteCategoryPayload[];
 };
 
-async function request<T>(path: string, options: RequestInit): Promise<T> {
-  try {
-    const res = await fetch(`${API_BASE_URL}${path}`, {
-      headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
-      ...options,
-    });
-    const data = (await res.json()) as T;
-    return data;
-  } catch (e) {
-    // Fallback shape for callers expecting { ok, error }
-    return { ok: false, error: 'Network error. Could not reach server.' } as unknown as T;
-  }
+export async function apiSignup(email: string, password: string): Promise<AuthResponse> {
+  const res = await http.post<AuthResponse>(
+    "/auth/signup",
+    { email, password },
+    { skipAuthRefresh: true }
+  );
+  return res.data;
 }
 
-export async function apiSignup(email: string, password: string) {
-  return request<AuthResponse>('/auth/signup', {
-    method: 'POST',
-    body: JSON.stringify({ email, password }),
-  });
+export async function apiLogin(email: string, password: string): Promise<AuthResponse> {
+  const res = await http.post<AuthResponse>(
+    "/auth/login",
+    { email, password },
+    { skipAuthRefresh: true }
+  );
+  return res.data;
 }
 
-export async function apiLogin(email: string, password: string) {
-  return request<AuthResponse>('/auth/login', {
-    method: 'POST',
-    body: JSON.stringify({ email, password }),
-  });
+export async function apiGetProfile(): Promise<UserProfileResponse> {
+  const res = await http.get<UserProfileResponse>("/api/profile");
+  return res.data;
 }
 
-export async function apiGetProfile(token: string) {
-  return request<UserProfileResponse>('/api/profile', {
-    method: 'GET',
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
-}
-
-export async function apiUpdateProfile(token: string, payload: UserProfileUpdatePayload) {
-  return request<UserProfileResponse>('/api/profile', {
-    method: 'PUT',
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify(payload),
-  });
+export async function apiUpdateProfile(payload: UserProfileUpdatePayload): Promise<UserProfileResponse> {
+  const res = await http.put<UserProfileResponse>("/api/profile", payload);
+  return res.data;
 }

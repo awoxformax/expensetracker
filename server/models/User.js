@@ -10,6 +10,8 @@ const userSchema = new Schema(
       lowercase: true,
     },
     passwordHash: { type: String, required: true },
+    refreshTokenHash: { type: String },
+    refreshTokenExpiresAt: { type: Date },
   },
   {
     collection: "users",

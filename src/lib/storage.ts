@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const TOKEN_KEY = 'auth_token';
+const REFRESH_TOKEN_KEY = 'auth_refresh_token';
 const USER_STATE_KEY = 'user_state_v1';
 const RECURRING_NOTIFY_KEY = 'recurring_notification_map_v1';
 
@@ -14,6 +15,18 @@ export async function getToken() {
 
 export async function clearToken() {
   await AsyncStorage.removeItem(TOKEN_KEY);
+}
+
+export async function saveRefreshToken(token: string) {
+  await AsyncStorage.setItem(REFRESH_TOKEN_KEY, token);
+}
+
+export async function getRefreshToken() {
+  return AsyncStorage.getItem(REFRESH_TOKEN_KEY);
+}
+
+export async function clearRefreshToken() {
+  await AsyncStorage.removeItem(REFRESH_TOKEN_KEY);
 }
 
 // Generic JSON helpers for app state

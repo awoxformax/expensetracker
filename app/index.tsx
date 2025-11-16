@@ -30,7 +30,7 @@ export default function Index() {
       if (!isActive) return;
       let onboardingDone = !!hasLocalFlag;
       if (!onboardingDone) {
-        const remote = await apiGetProfile(token);
+        const remote = await apiGetProfile();
         if (!isActive) return;
         if (remote.ok && remote.data?.onboardingCompleted) {
           await AsyncStorage.setItem(ONBOARDING_DONE_KEY, 'true');

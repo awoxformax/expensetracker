@@ -89,7 +89,7 @@ export default function HomeScreen() {
       .slice(0, 2)
       .toUpperCase() || "İS";
 
-  const heroGradient = isDark ? ["#0B0F14", "#132138"] : ["#00C853", "#009624"];
+  const heroGradient: [string, string] = isDark ? ["#0B0F14", "#132138"] : ["#00C853", "#009624"];
   const heroBubble = isDark ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.12)";
   const heroBubbleSecondary = isDark ? "rgba(15,23,42,0.25)" : "rgba(0,0,0,0.08)";
   const cardBackground = isDark ? colors.card : "#FFFFFF";

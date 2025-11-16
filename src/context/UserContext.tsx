@@ -184,7 +184,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     let cancelled = false;
     (async () => {
       try {
-        const response = await apiGetProfile(token);
+        const response = await apiGetProfile();
         if (!response.ok || cancelled) return;
         applyRemoteProfile(response.data);
         if (response.data?.onboardingCompleted) {
@@ -203,7 +203,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     async (payload: UserProfileUpdatePayload) => {
       if (!token) return;
       try {
-        await apiUpdateProfile(token, payload);
+        await apiUpdateProfile(payload);
       } catch (err) {
         console.warn("Profile sync failed", err);
       }
