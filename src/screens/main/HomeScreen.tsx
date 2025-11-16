@@ -37,7 +37,7 @@ type QuickAction = {
 export default function HomeScreen() {
   const router = useRouter();
   const { logout, token } = useAuth();
-  const { fonts } = useTheme();
+  const { fonts, colors, isDark } = useTheme();
   const { state } = useUser();
   const { transactions, reminders, loading, loadTransactions } = useTransactions();
   const insets = useSafeAreaInsets();
@@ -73,25 +73,50 @@ export default function HomeScreen() {
   const totalExpense = expenses.reduce((sum, t) => sum + t.amount, 0);
   const balance = totalIncome - totalExpense;
 
-  const fullName =
-     [state?.profile?.firstName, state?.profile?.lastName].filter(Boolean).join(" ") || "Ehmedli";
-  const friendlyName = fullName.split(" ")[0] || fullName;
-  const initials = fullName
-    .split(" ")
-    .map((part) => part.charAt(0))
-    .join("")
-    .slice(0, 2)
-    .toUpperCase() || "E";
+  const firstName = state?.profile?.firstName?.trim() ?? "";
+  const lastName = state?.profile?.lastName?.trim() ?? "";
+  const nameFromProfile = [firstName, lastName].filter(Boolean).join(" ").trim();
+  const fallbackName = nameFromProfile || state?.profile?.phone || "İstifadəçi";
+  const fullName = nameFromProfile || fallbackName;
+  const friendlyName = firstName || fallbackName.split(" ")[0] || fallbackName;
+  const initialsSource = nameFromProfile || friendlyName;
+  const initials =
+    initialsSource
+      .split(" ")
+      .filter(Boolean)
+      .map((part) => part.charAt(0))
+      .join("")
+      .slice(0, 2)
+      .toUpperCase() || "İS";
 
-const recentTransactions = useMemo(() => {
-  const safeTransactions = Array.isArray(transactions) ? transactions : [];
-  return safeTransactions
-    .slice()
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-    .slice(0, 5);
-}, [transactions]);
+  const heroGradient = isDark ? ["#0B0F14", "#132138"] : ["#00C853", "#009624"];
+  const heroBubble = isDark ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.12)";
+  const heroBubbleSecondary = isDark ? "rgba(15,23,42,0.25)" : "rgba(0,0,0,0.08)";
+  const cardBackground = isDark ? colors.card : "#FFFFFF";
+  const sectionBackground = isDark ? colors.card : "#FFFFFF";
+  const heroActionBackground = isDark ? colors.card : "#FFFFFF";
+  const heroActionIconBg = isDark ? "rgba(34,197,94,0.16)" : "rgba(0,150,36,0.08)";
+  const textOnSurface = isDark ? colors.text : TEXT_DARK;
+  const mutedTextColor = isDark ? colors.textMuted : TEXT_MUTED;
+  const surfaceShadow = isDark ? "rgba(0,0,0,0.45)" : "rgba(15,23,42,0.08)";
+  const accentColor = colors.primary ?? "#4F8BFF";
+  const pillBackground = isDark ? "rgba(79,139,255,0.18)" : "#EEF2FF";
+  const badgeBackground = isDark ? "rgba(79,139,255,0.25)" : "#E0EAFF";
+  const previewIconBackground = isDark ? "rgba(79,139,255,0.15)" : "#E4ECFF";
+  const previewIconColor = accentColor;
+  const sectionCardBorder = isDark ? colors.border : "#EEF2F7";
+  const dividerColor = isDark ? "rgba(148,163,184,0.2)" : "#E5E7EB";
+  const chipBackground = isDark ? "rgba(248,250,255,0.08)" : "#EEF2F7";
+  const positiveColor = "#16A34A";
+  const negativeColor = "#EF4444";
 
-
+  const recentTransactions = useMemo(() => {
+    const safeTransactions = Array.isArray(transactions) ? transactions : [];
+    return safeTransactions
+      .slice()
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .slice(0, 5);
+  }, [transactions]);
 
   const transactionAnimations = useRef<Animated.Value[]>([]);
   const pulseAnim = useRef(new Animated.Value(0)).current;
@@ -201,9 +226,9 @@ const recentTransactions = useMemo(() => {
   );
 
 return (
-<View style={styles.root}>
+<View style={[styles.root, { backgroundColor: colors.background }]}>
   <LinearGradient
-    colors={["#00C853", "#009624"]}
+    colors={heroGradient}
     start={{ x: 0, y: 0 }}
     end={{ x: 0, y: 1 }}
     style={{
@@ -221,7 +246,7 @@ return (
     {/* SafeAreaView artıq transparent olur */}
     <SafeAreaView style={[styles.safe, { backgroundColor: "transparent" }]}>
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { backgroundColor: colors.background }]}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -235,7 +260,7 @@ return (
 
 {/* ✅ Yeni gradient və header bölməsi */}
 <LinearGradient
-  colors={["#00C853", "#009624"]}
+  colors={heroGradient}
   start={{ x: 0, y: 0 }}
   end={{ x: 0, y: 1 }}
   style={[
@@ -245,12 +270,12 @@ return (
 />
 
 <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
-  <View style={styles.headerBubble} />
-  <View style={styles.headerBubbleSecondary} />
+  <View style={[styles.headerBubble, { backgroundColor: heroBubble }]} />
+  <View style={[styles.headerBubbleSecondary, { backgroundColor: heroBubbleSecondary }]} />
 
   <View style={styles.profileRow}>
     <View style={styles.profileInfo}>
-      <View style={styles.avatar}>
+      <View style={[styles.avatar, { backgroundColor: isDark ? "rgba(255,255,255,0.16)" : "rgba(255,255,255,0.15)" }]}>
         <Text style={[styles.avatarText, { fontFamily: fonts.heading }]}>{initials}</Text>
       </View>
       <View>
@@ -287,85 +312,85 @@ return (
 </View>
 
 
-          <View style={styles.bodyCard}>
+          <View style={[styles.bodyCard, { backgroundColor: cardBackground, shadowColor: surfaceShadow }]}>
             <View style={styles.heroActionsWrapper}>
               {heroActions.map((action) => (
                 <Pressable
                   key={action.label}
-                  style={({ pressed }) => [styles.heroActionCard, pressed && styles.heroActionCardPressed]}
+                  style={({ pressed }) => [styles.heroActionCard, pressed && styles.heroActionCardPressed, { backgroundColor: heroActionBackground, shadowColor: surfaceShadow }]}
                   onPress={action.onPress}
                 >
-                  <View style={styles.heroActionIcon}>
-                    <Ionicons name={action.icon} size={20} color="#006E2E" />
+                  <View style={[styles.heroActionIcon, { backgroundColor: heroActionIconBg }]}> 
+                    <Ionicons name={action.icon} size={20} color={isDark ? "#22c55e" : "#006E2E"} />
                   </View>
-                  <Text style={styles.heroActionText}>{action.label}</Text>
+                  <Text style={[styles.heroActionText, { color: textOnSurface }]}>{action.label}</Text>
                 </Pressable>
               ))}
             </View>
 
             <View style={styles.sectionIntro}>
-              <Text style={styles.sectionTitleDark}>Xatırlatmalarım</Text>
-              <TouchableOpacity style={styles.addCardPill} onPress={goToReminderBuilder}>
-                <Ionicons name="calendar-outline" size={16} color="#2563EB" />
-                <Text style={styles.addCardText}>Xatırlatma əlavə et</Text>
+              <Text style={[styles.sectionTitleDark, { color: textOnSurface }]}>Xatırlatmalarım</Text>
+              <TouchableOpacity style={[styles.addCardPill, { backgroundColor: pillBackground }]}  onPress={goToReminderBuilder}>
+                <Ionicons name="calendar-outline" size={16} color={accentColor} />
+                <Text style={[styles.addCardText, { color: accentColor }]} >Xatırlatma əlavə et</Text>
               </TouchableOpacity>
             </View>
 
-            <View style={styles.autoCard}>
+            <View style={[styles.autoCard, { backgroundColor: sectionBackground, borderColor: isDark ? "rgba(148,163,184,0.25)" : "#E2E8F0" }]}>
               <View style={styles.autoCardHeader}>
                 <View>
-                  <Text style={styles.autoTitle}>Xatırlatmalar</Text>
-                  <Text style={styles.autoSubtitle}>Gəlir və ödənişləri planlaşdır.</Text>
+                  <Text style={[styles.autoTitle, { color: textOnSurface }]}>Xatırlatmalar</Text>
+                  <Text style={[styles.autoSubtitle, { color: mutedTextColor }]}>Gəlir və ödənişləri planlaşdır.</Text>
                 </View>
-                <TouchableOpacity style={styles.autoBadge} onPress={goToReminderBuilder}>
-                  <Ionicons name="add-outline" size={16} color="#1E40AF" />
-                  <Text style={styles.autoBadgeText}>Yeni</Text>
+                <TouchableOpacity style={[styles.autoBadge, { backgroundColor: badgeBackground }]}  onPress={goToReminderBuilder}>
+                  <Ionicons name="add-outline" size={16} color={accentColor} />
+                  <Text style={[styles.autoBadgeText, { color: accentColor }]} >Yeni</Text>
                 </TouchableOpacity>
               </View>
               {upcomingReminders.length ? (
                 upcomingReminders.map((item) => (
                   <View key={item.id} style={styles.reminderPreviewRow}>
-                    <View style={styles.reminderPreviewIcon}>
+                    <View style={[styles.reminderPreviewIcon, { backgroundColor: previewIconBackground }]} >
                       <Ionicons
                         name={item.kind === "income" ? "trending-up-outline" : "card-outline"}
                         size={16}
-                        color="#2563EB"
+                        color={accentColor}
                       />
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.reminderPreviewTitle}>{item.title}</Text>
-                      <Text style={styles.reminderPreviewMeta}>{reminderDescription(item)}</Text>
+                      <Text style={[styles.reminderPreviewTitle, { color: textOnSurface }]} >{item.title}</Text>
+                      <Text style={[styles.reminderPreviewMeta, { color: mutedTextColor }]} >{reminderDescription(item)}</Text>
                     </View>
                   </View>
                 ))
               ) : (
-                <Text style={styles.reminderEmpty}>Hələ xatırlatma yoxdur.</Text>
+                <Text style={[styles.reminderEmpty, { color: mutedTextColor }]} >Hələ xatırlatma yoxdur.</Text>
               )}
             </View>
 
-            <View style={styles.sectionCard}>
+            <View style={[styles.sectionCard, { backgroundColor: sectionBackground, borderColor: sectionCardBorder, shadowColor: surfaceShadow }]}>
               <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Likvidlik xülasəsi</Text>
+                <Text style={[styles.sectionTitle, { color: textOnSurface }]} >Likvidlik xülasəsi</Text>
                 <TouchableOpacity onPress={() => router.push("/(tabs)/stats")}>
-                  <Text style={styles.sectionLink}>Statistika</Text>
+                  <Text style={[styles.sectionLink, { color: accentColor }]} >Statistika</Text>
                 </TouchableOpacity>
               </View>
               <View style={styles.summaryRow}>
                 <View>
-                  <Text style={styles.summaryLabel}>Son 30 gün</Text>
-                  <Text style={styles.summaryValue}>
+                  <Text style={[styles.summaryLabel, { color: mutedTextColor }]} >Son 30 gün</Text>
+                  <Text style={[styles.summaryValue, { color: textOnSurface }]} >
                     {recentTransactions.length ? `${recentTransactions.length} əməliyyat` : "Məlumat yoxdur"}
                   </Text>
                 </View>
-                {loading && <ActivityIndicator size="small" color={PRIMARY} />}
+                {loading && <ActivityIndicator size="small" color={accentColor} />}
               </View>
             </View>
 
-            <View style={[styles.sectionCard, styles.transactionsCard]}>
+            <View style={[styles.sectionCard, styles.transactionsCard, { backgroundColor: sectionBackground, borderColor: sectionCardBorder, shadowColor: surfaceShadow }]}>
               <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Son əməliyyatlar</Text>
+                <Text style={[styles.sectionTitle, { color: textOnSurface }]} >Son əməliyyatlar</Text>
                 <TouchableOpacity onPress={() => router.push("/(tabs)/transactions")}>
-                  <Text style={styles.sectionLink}>Hamısı</Text>
+                  <Text style={[styles.sectionLink, { color: accentColor }]} >Hamısı</Text>
                 </TouchableOpacity>
               </View>
               {recentTransactions.length ? (
@@ -429,8 +454,8 @@ return (
                         </View>
                       </View>
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.transactionTitle}>{item.category || "Kateqoriya"}</Text>
-                        <Text style={styles.transactionDate}>{formatDate(item.date)}</Text>
+                        <Text style={[styles.transactionTitle, { color: textOnSurface }]} >{item.category || "Kateqoriya"}</Text>
+                        <Text style={[styles.transactionDate, { color: mutedTextColor }]} >{formatDate(item.date)}</Text>
                       </View>
                       <Text
                         style={[
@@ -445,13 +470,13 @@ return (
                   );
                 })
               ) : (
-                <Text style={styles.emptyText}>Əməliyyat tapılmadı.</Text>
+                <Text style={[styles.emptyText, { color: mutedTextColor }]} >Əməliyyat tapılmadı.</Text>
               )}
             </View>
 
             <TouchableOpacity style={styles.logoutBtn} onPress={logout}>
-              <Ionicons name="log-out-outline" size={16} color="#EF4444" />
-              <Text style={styles.logoutText}>Çıxış</Text>
+              <Ionicons name="log-out-outline" size={16} color={negativeColor} />
+              <Text style={[styles.logoutText, { color: negativeColor }]} >Çıxış</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -520,7 +545,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 28,
+    marginTop: 12,
     gap: 16,
   },
   balanceValueRow: { flexDirection: "row", alignItems: "flex-end", gap: 6 },
@@ -550,7 +575,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     gap: 12,
-    marginTop: -58,
+    marginTop: -48,
     marginBottom: 12,
   },
   heroActionCard: {
@@ -697,3 +722,22 @@ const styles = StyleSheet.create({
   },
   logoutText: { color: "#EF4444", fontWeight: "600" },
 });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

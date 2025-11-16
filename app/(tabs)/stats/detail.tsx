@@ -12,9 +12,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { useTransactions, Transaction } from "../../../src/context/TransactionsContext";
+import { useTheme } from "../../../src/theme/ThemeProvider";
 
-const MONTH_NAMES = ["Yan", "Fev", "Mar", "Apr", "May", "İyun", "İyul", "Avq", "Sen", "Okt", "Noy", "Dek"];
-const PIE_COLORS = ["#357BFF", "#00C897", "#FF6B6B", "#F59E0B", "#A855F7"];
+const MONTH_NAMES = ["Yan", "Fev", "Mar", "Apr", "May", "İyn", "İyl", "Avq", "Sen", "Okt", "Noy", "Dek"];
 
 const formatMonthKey = (date: Date) =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
@@ -31,7 +31,7 @@ const computeTotals = (transactions: Transaction[]) =>
     { income: 0, expense: 0 }
   );
 
-const computeCategoriesShare = (transactions: Transaction[]) => {
+const computeCategoriesShare = (transactions: Transaction[], paletteColors: string[]) => {
   const expenses = transactions.filter((t) => t.type === "expense");
   if (!expenses.length) return [];
   const totals = expenses.reduce((map, tx) => {
@@ -44,7 +44,7 @@ const computeCategoriesShare = (transactions: Transaction[]) => {
   return Object.entries(totals).map(([label, amount], idx) => ({
     label,
     value: ((amount / total) * 100).toFixed(1),
-    color: PIE_COLORS[idx % PIE_COLORS.length],
+    color: paletteColors[idx % paletteColors.length],
   }));
 };
 
@@ -54,7 +54,7 @@ const computeInsight = (transactions: Transaction[]) => {
     return "AI analizi üçün kifayət qədər məlumat yoxdur.";
   }
   if (!expenses.length) {
-    return "Bu ay xərc qeyd etməmisiniz – balans stabil görünür.";
+    return "Bu ay xərc əməliyyatı qeyd etməmisiniz, balans stabil görünür.";
   }
   const totals = expenses.reduce((map, tx) => {
     const key = tx.category || "Digər";
@@ -66,21 +66,52 @@ const computeInsight = (transactions: Transaction[]) => {
   const [topCategory, topAmount] = Object.entries(totals).sort((a, b) => b[1] - a[1])[0];
   const share = ((topAmount / Math.max(totalExpense, 1)) * 100).toFixed(1);
 
-  return `${topCategory} xərcləri bu ay ümumi xərcin ${share}% təşkil edir. Daha balanslı büdcə üçün limiti izləyin.`;
+  return `${topCategory} xərcləri bu ay ümumi xərcin ${share}% təşkil edir. Daha balanslı büdcə üçün limitləri izləyin.`;
 };
 
 export default function DetailScreen() {
   const router = useRouter();
   const { transactions, loadTransactions, loading, error } = useTransactions();
+  const { colors, isDark } = useTheme();
   const [selectedDate, setSelectedDate] = useState(() => new Date());
   const monthKey = useMemo(() => formatMonthKey(selectedDate), [selectedDate]);
 
   useEffect(() => {
     loadTransactions(monthKey);
-  }, [monthKey, loadTransactions]);
+  }, [loadTransactions, monthKey]);
+
+  const palette = useMemo(() => {
+    const accent = colors.primary ?? "#4F8BFF";
+    const income = "#10B981";
+    const expense = "#EF4444";
+    return {
+      background: colors.background,
+      card: colors.card,
+      text: colors.text,
+      muted: colors.textMuted,
+      border: colors.border,
+      chip: isDark ? "rgba(255,255,255,0.08)" : "#EEF4FF",
+      highlight: isDark ? "rgba(79,139,255,0.25)" : "rgba(79,139,255,0.12)",
+      accent,
+      income,
+      expense,
+      headerGradient: colors.bgGradient,
+      pieColors: [accent, colors.accent, colors.ctaGradient[0], colors.ctaGradient[1], income],
+    };
+  }, [colors, isDark]);
+
+  const styles = useMemo(() => createDetailStyles(palette), [palette]);
+  const textColor = palette.text;
+  const mutedColor = palette.muted;
+  const accentColor = palette.accent;
+  const incomeColor = palette.income;
+  const expenseColor = palette.expense;
 
   const totals = useMemo(() => computeTotals(transactions), [transactions]);
-  const categoriesShare = useMemo(() => computeCategoriesShare(transactions), [transactions]);
+  const categoriesShare = useMemo(
+    () => computeCategoriesShare(transactions, palette.pieColors),
+    [transactions, palette.pieColors]
+  );
   const aiMessage = useMemo(() => computeInsight(transactions), [transactions]);
 
   const incomeHeight = useRef(new Animated.Value(0)).current;
@@ -100,7 +131,7 @@ export default function DetailScreen() {
         useNativeDriver: false,
       }),
     ]).start();
-  }, [incomeHeight, expenseHeight, totals]);
+  }, [totals, incomeHeight, expenseHeight]);
 
   const goNext = useCallback(() => {
     const today = new Date();
@@ -143,23 +174,27 @@ export default function DetailScreen() {
 
   return (
     <View style={styles.gestureWrapper} {...panResponder.panHandlers}>
-      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-        <LinearGradient colors={["#F5F9FF", "#FFFFFF"]} style={styles.header}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <LinearGradient colors={palette.headerGradient} style={styles.header}>
           <View style={styles.topRow}>
             <TouchableOpacity
               onPress={() => router.back()}
               style={styles.backBtn}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
-              <Ionicons name="chevron-back" size={22} color="#1E293B" />
+              <Ionicons name="chevron-back" size={22} color={textColor} />
             </TouchableOpacity>
             <Text style={styles.headerTitle}>Aylıq balansın</Text>
-            <Ionicons name="stats-chart-outline" size={20} color="#1E293B" />
+            <Ionicons name="stats-chart-outline" size={20} color={textColor} />
           </View>
 
           <View style={styles.monthRow}>
             <TouchableOpacity onPress={goPrev} style={styles.monthControl}>
-              <Ionicons name="chevron-back" size={20} color="#1E293B" />
+              <Ionicons name="chevron-back" size={20} color={textColor} />
             </TouchableOpacity>
             <View style={styles.monthActive}>
               <Text style={styles.monthActiveText}>{monthLabel}</Text>
@@ -168,7 +203,7 @@ export default function DetailScreen() {
               <Ionicons
                 name="chevron-forward"
                 size={20}
-                color={isNextDisabled ? "#CBD5F5" : "#1E293B"}
+                color={isNextDisabled ? mutedColor : textColor}
               />
             </TouchableOpacity>
           </View>
@@ -176,13 +211,13 @@ export default function DetailScreen() {
           <View style={styles.summaryRow}>
             <View style={styles.col}>
               <Text style={styles.label}>Xərc</Text>
-              <Text style={[styles.value, { color: "#FF6B6B" }]}>
+              <Text style={[styles.value, { color: expenseColor }]}>
                 {totals.expense.toFixed(2)} AZN
               </Text>
             </View>
             <View style={styles.col}>
               <Text style={styles.label}>Gəlir</Text>
-              <Text style={[styles.value, { color: "#00C897" }]}>
+              <Text style={[styles.value, { color: incomeColor }]}>
                 {totals.income.toFixed(2)} AZN
               </Text>
             </View>
@@ -191,16 +226,16 @@ export default function DetailScreen() {
 
         <View style={styles.statusRow}>
           {loading && <Text style={styles.statusText}>Yüklənir...</Text>}
-          {!!error && <Text style={[styles.statusText, { color: "#FF6B6B" }]}>{error}</Text>}
+          {!!error && <Text style={[styles.statusText, { color: expenseColor }]}>{error}</Text>}
         </View>
 
         <View style={styles.chartArea}>
           <View style={styles.barGroup}>
-            <Animated.View style={[styles.bar, { backgroundColor: "#FF6B6B", height: expenseHeight }]} />
+            <Animated.View style={[styles.bar, { backgroundColor: expenseColor, height: expenseHeight }]} />
             <Text style={styles.barLabel}>Xərc</Text>
           </View>
           <View style={styles.barGroup}>
-            <Animated.View style={[styles.bar, { backgroundColor: "#00C897", height: incomeHeight }]} />
+            <Animated.View style={[styles.bar, { backgroundColor: incomeColor, height: incomeHeight }]} />
             <Text style={styles.barLabel}>Gəlir</Text>
           </View>
         </View>
@@ -213,7 +248,7 @@ export default function DetailScreen() {
           <Text style={styles.categoriesTitle}>Kateqoriya üzrə pay</Text>
           {categoriesShare.length ? (
             categoriesShare.map((cat, idx) => (
-              <View key={idx} style={styles.categoryRow}>
+              <View key={`${cat.label}-${idx}`} style={styles.categoryRow}>
                 <View style={[styles.legendDot, { backgroundColor: cat.color }]} />
                 <Text style={styles.categoryLabel}>{cat.label}</Text>
                 <Text style={styles.categoryValue}>{cat.value}%</Text>
@@ -225,7 +260,7 @@ export default function DetailScreen() {
         </View>
 
         <View style={styles.aiBox}>
-          <Ionicons name="sparkles-outline" size={20} color="#1E90FF" style={{ marginRight: 8 }} />
+          <Ionicons name="sparkles-outline" size={20} color={accentColor} style={{ marginRight: 8 }} />
           <Text style={styles.aiText}>{aiMessage}</Text>
         </View>
       </ScrollView>
@@ -233,114 +268,140 @@ export default function DetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  gestureWrapper: { flex: 1 },
-  container: { flex: 1, backgroundColor: "#FFFFFF" },
-  header: {
-    borderBottomLeftRadius: 25,
-    borderBottomRightRadius: 25,
-    paddingTop: 50,
-    paddingHorizontal: 20,
-    paddingBottom: 25,
-  },
-  topRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  backBtn: { padding: 4, borderRadius: 999 },
-  headerTitle: { fontSize: 15, fontWeight: "600", color: "#1E293B" },
-  monthRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginTop: 18,
-  },
-  monthControl: {
-    padding: 8,
-    borderRadius: 999,
-    backgroundColor: "#EEF4FF",
-  },
-  monthActive: {
-    backgroundColor: "#E0EDFF",
-    borderRadius: 18,
-    paddingHorizontal: 18,
-    paddingVertical: 4,
-  },
-  monthActiveText: { color: "#1E90FF", fontWeight: "600" },
-  summaryRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 20,
-    paddingHorizontal: 10,
-  },
-  col: { alignItems: "center" },
-  label: { fontSize: 13, color: "#64748B" },
-  value: { fontSize: 22, fontWeight: "700" },
-  statusRow: {
-    flexDirection: "row",
-    justifyContent: "center",
-    marginTop: 12,
-  },
-  statusText: {
-    fontSize: 12,
-    color: "#64748B",
-  },
-  chartArea: {
-    flexDirection: "row",
-    justifyContent: "space-evenly",
-    alignItems: "flex-end",
-    height: 220,
-    marginTop: 15,
-  },
-  barGroup: { alignItems: "center" },
-  bar: { width: 40, borderRadius: 10 },
-  barLabel: { marginTop: 8, fontSize: 13, color: "#475569" },
-  totalText: {
-    textAlign: "center",
-    marginTop: 10,
-    fontSize: 13,
-    color: "#475569",
-  },
-  categoriesCard: {
-    marginTop: 20,
-    marginHorizontal: 20,
-    padding: 16,
-    borderRadius: 16,
-    backgroundColor: "#F8FAFF",
-  },
-  categoriesTitle: {
-    fontSize: 15,
-    fontWeight: "600",
-    marginBottom: 12,
-    color: "#0F172A",
-  },
-  categoryRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 10,
-  },
-  legendDot: { width: 12, height: 12, borderRadius: 6, marginRight: 10 },
-  categoryLabel: { flex: 1, fontSize: 13, color: "#1E293B" },
-  categoryValue: { fontSize: 13, color: "#475569", fontWeight: "600" },
-  emptyState: {
-    textAlign: "center",
-    fontSize: 13,
-    color: "#94A3B8",
-  },
-  aiBox: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 20,
-    marginHorizontal: 20,
-    borderRadius: 12,
-    padding: 12,
-    backgroundColor: "rgba(53,123,255,0.08)",
-  },
-  aiText: {
-    flex: 1,
-    fontSize: 13,
-    fontWeight: "500",
-    color: "#1E293B",
-  },
-});
+const createDetailStyles = (palette: DetailPalette) =>
+  StyleSheet.create({
+    gestureWrapper: { flex: 1, backgroundColor: palette.background },
+    container: { flex: 1, backgroundColor: palette.background },
+    scrollContent: { paddingBottom: 32 },
+    header: {
+      borderBottomLeftRadius: 25,
+      borderBottomRightRadius: 25,
+      paddingTop: 50,
+      paddingHorizontal: 20,
+      paddingBottom: 25,
+    },
+    topRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+    },
+    backBtn: { padding: 4, borderRadius: 999, backgroundColor: palette.chip },
+    headerTitle: { fontSize: 15, fontWeight: "600", color: palette.text },
+    monthRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginTop: 18,
+    },
+    monthControl: {
+      padding: 8,
+      borderRadius: 999,
+      backgroundColor: palette.chip,
+    },
+    monthActive: {
+      backgroundColor: palette.highlight,
+      borderRadius: 18,
+      paddingHorizontal: 18,
+      paddingVertical: 4,
+    },
+    monthActiveText: { fontWeight: "600", color: palette.accent },
+    summaryRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      marginTop: 20,
+      paddingHorizontal: 10,
+    },
+    col: { alignItems: "center" },
+    label: { fontSize: 13, color: palette.muted },
+    value: { fontSize: 22, fontWeight: "700", color: palette.text },
+    statusRow: {
+      flexDirection: "row",
+      justifyContent: "center",
+      marginTop: 12,
+    },
+    statusText: {
+      fontSize: 12,
+      color: palette.muted,
+    },
+    chartArea: {
+      flexDirection: "row",
+      justifyContent: "space-evenly",
+      alignItems: "flex-end",
+      height: 220,
+      marginTop: 15,
+    },
+    barGroup: { alignItems: "center" },
+    bar: { width: 40, borderRadius: 10 },
+    barLabel: { marginTop: 8, fontSize: 13, color: palette.muted },
+    totalText: {
+      textAlign: "center",
+      marginTop: 10,
+      fontSize: 13,
+      color: palette.muted,
+    },
+    categoriesCard: {
+      marginTop: 20,
+      marginHorizontal: 20,
+      padding: 16,
+      borderRadius: 16,
+      backgroundColor: palette.card,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: palette.border,
+    },
+    categoriesTitle: {
+      fontSize: 15,
+      fontWeight: "600",
+      marginBottom: 12,
+      color: palette.text,
+    },
+    categoryRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginBottom: 10,
+    },
+    legendDot: {
+      width: 12,
+      height: 12,
+      borderRadius: 6,
+      marginRight: 10,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: palette.border,
+    },
+    categoryLabel: { flex: 1, fontSize: 13, color: palette.text },
+    categoryValue: { fontSize: 13, fontWeight: "600", color: palette.muted },
+    emptyState: {
+      textAlign: "center",
+      fontSize: 13,
+      color: palette.muted,
+    },
+    aiBox: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginTop: 20,
+      marginHorizontal: 20,
+      borderRadius: 12,
+      padding: 12,
+      backgroundColor: palette.highlight,
+    },
+    aiText: {
+      flex: 1,
+      fontSize: 13,
+      fontWeight: "500",
+      color: palette.text,
+    },
+  });
+
+type DetailPalette = {
+  background: string;
+  card: string;
+  text: string;
+  muted: string;
+  border: string;
+  chip: string;
+  highlight: string;
+  accent: string;
+  income: string;
+  expense: string;
+  headerGradient: [string, string];
+  pieColors: string[];
+};

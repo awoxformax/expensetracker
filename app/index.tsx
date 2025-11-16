@@ -5,8 +5,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../src/theme/ThemeProvider';
 import { useOnboarding } from '../src/context/Onboarding';
 import { ONBOARDING_DONE_KEY } from '../src/constants/storage';
-import { getToken } from '../src/lib/storage';
+import { getItem, getToken } from '../src/lib/storage';
 import { apiGetProfile } from '../src/lib/api';
+import { PIN_KEY } from '../src/constants/security';
 import 'react-native-reanimated';
 
 
@@ -25,21 +26,30 @@ export default function Index() {
         router.replace('/auth/welcome');
         return;
       }
-      const flag = await AsyncStorage.getItem(ONBOARDING_DONE_KEY);
+      const hasLocalFlag = await AsyncStorage.getItem(ONBOARDING_DONE_KEY);
       if (!isActive) return;
-      if (flag) {
-        router.replace('/(tabs)/home');
-        return;
+      let onboardingDone = !!hasLocalFlag;
+      if (!onboardingDone) {
+        const remote = await apiGetProfile(token);
+        if (!isActive) return;
+        if (remote.ok && remote.data?.onboardingCompleted) {
+          await AsyncStorage.setItem(ONBOARDING_DONE_KEY, 'true');
+          onboardingDone = true;
+        }
       }
-      const remote = await apiGetProfile(token);
       if (!isActive) return;
-      if (remote.ok && remote.data?.onboardingCompleted) {
-        await AsyncStorage.setItem(ONBOARDING_DONE_KEY, 'true');
-        router.replace('/(tabs)/home');
-      } else {
+      if (!onboardingDone) {
         reset();
         router.replace('/onboarding/tutorial');
+        return;
       }
+      const existingPin = await getItem<string | null>(PIN_KEY, null);
+      if (!isActive) return;
+      if (!existingPin || existingPin.length < 4) {
+        router.replace('/pin-setup');
+        return;
+      }
+      router.replace('/auth/unlock');
     })();
     return () => {
       isActive = false;

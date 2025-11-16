@@ -1,59 +1,89 @@
-import React, { useState, useEffect } from "react";
+﻿import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
-import { setItem, getItem } from "@/src/lib/storage";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Stack } from "expo-router";
+import { useTheme } from "@/src/theme/ThemeProvider";
+import { useLang } from "@/src/context/LangContext";
 
-export default function Language() {
-  const [lang, setLang] = useState("az");
-  const languages = [
-    { code: "az", name: "Azərbaycan" },
-    { code: "en", name: "English" },
-    { code: "ru", name: "Русский" },
-  ];
+type LanguageCode = "az" | "en" | "ru";
 
-  useEffect(() => {
-    (async () => {
-      const stored = await getItem("appLang", "az");
-      setLang(stored);
-    })();
-  }, []);
+const LANGUAGE_FLAGS: Record<LanguageCode, string> = {
+  az: "🇦🇿",
+  en: "🇬🇧",
+  ru: "🇷🇺",
+};
 
-  async function changeLang(code: string) {
-    setLang(code);
-    await setItem("appLang", code);
-  }
+const OPTIONS: LanguageCode[] = ["az", "en", "ru"];
+
+export default function LanguageScreen() {
+  const { colors } = useTheme();
+  const { lang, setLang, t } = useLang();
+  const insets = useSafeAreaInsets();
 
   return (
-    <View style={styles.container}>
-      <Stack.Screen options={{ title: "Dil seçimi" }} />
-      {languages.map((item) => (
-        <TouchableOpacity
-          key={item.code}
-          style={[
-            styles.item,
-            { backgroundColor: lang === item.code ? "#E0E7FF" : "#fff" },
-          ]}
-          onPress={() => changeLang(item.code)}
-        >
-          <Text style={styles.text}>{item.name}</Text>
-          {lang === item.code && <Text style={styles.selected}>Seçildi</Text>}
-        </TouchableOpacity>
-      ))}
-    </View>
+    <SafeAreaView
+      style={[styles.safe, { backgroundColor: colors.background, paddingTop: insets.top + 16 }]}
+    >
+      <Stack.Screen options={{ title: t("language_title") }} />
+      <View style={styles.wrapper}>
+        {OPTIONS.map((code) => {
+          const active = lang === code;
+          return (
+            <TouchableOpacity
+              key={code}
+              onPress={() => setLang(code)}
+              style={[
+                styles.item,
+                {
+                  borderColor: active ? colors.primary : colors.border,
+                  backgroundColor: active ? colors.card : colors.background,
+                },
+              ]}
+              activeOpacity={0.9}
+            >
+              <Text style={styles.flag}>{LANGUAGE_FLAGS[code]}</Text>
+              <Text style={[styles.name, { color: colors.text }]}>
+                {t(`language_option_${code}`)}
+              </Text>
+              <Text style={[styles.code, { color: active ? colors.primary : colors.subtext }]}>
+                {active ? t("language_selected") : code.toUpperCase()}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F4F6F9", padding: 20 },
-  item: {
-    backgroundColor: "#fff",
-    padding: 15,
-    borderRadius: 12,
-    marginBottom: 10,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+  safe: {
+    flex: 1,
   },
-  text: { color: "#0F172A", fontWeight: "600" },
-  selected: { color: "#2563EB", fontWeight: "700" },
+  wrapper: {
+    flexGrow: 1,
+    justifyContent: "center",
+    paddingHorizontal: 20,
+    gap: 16,
+  },
+  item: {
+    borderWidth: 1.5,
+    borderRadius: 16,
+    paddingVertical: 18,
+    paddingHorizontal: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  flag: { fontSize: 26 },
+  name: {
+    fontSize: 16,
+    fontWeight: "700",
+    flex: 1,
+    marginHorizontal: 16,
+  },
+  code: {
+    fontSize: 13,
+    fontWeight: "600",
+  },
 });

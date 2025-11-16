@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTheme } from '../../src/theme/ThemeProvider';
 import { ProfileType, useOnboarding } from '../../src/context/Onboarding';
+import { PRE_HOME_BACKGROUND } from '../../src/constants/ui';
 
 const PROFILES: { label: string; value: ProfileType; description: string }[] = [
   { label: 'Tələbə', value: 'student', description: 'Təhsil və gündəlik xərclərə fokuslan.' },
@@ -24,7 +25,7 @@ export default function ProfileScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
+    <SafeAreaView style={styles.safe}>
       <View style={styles.content}>
         <Text style={[styles.title, { color: '#F8FAFF', fontFamily: fonts.heading }]}>Səni tanıyaq</Text>
         <Text style={[styles.subtitle, { color: '#A5B4FC', fontFamily: fonts.body }]}>
@@ -88,6 +89,7 @@ const styles = StyleSheet.create({
   safe: {
     flex: 1,
     padding: 24,
+    backgroundColor: PRE_HOME_BACKGROUND,
   },
   content: {
     flex: 1,
@@ -144,4 +146,3 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 });
-

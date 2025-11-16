@@ -15,16 +15,7 @@ import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useTransactions, Category, Reminder } from "../../src/context/TransactionsContext";
-
-const COLORS = {
-  background: "#F7F9FD",
-  card: "#FFFFFF",
-  primary: "#2563EB",
-  secondary: "#EEF2FF",
-  text: "#0F172A",
-  muted: "#64748B",
-  border: "#E2E8F0",
-};
+import { useTheme } from "../../src/theme/ThemeProvider";
 
 type FormConfig = {
   visible: boolean;
@@ -37,6 +28,22 @@ const amountLabel = (value?: number) => `${(value ?? 0).toFixed(2)} AZN`;
 export default function TransactionsScreen() {
   const router = useRouter();
   const { categories, reminders, createTransaction, addCategory, addReminder } = useTransactions();
+  const { colors, isDark } = useTheme();
+  const palette = useMemo(
+    () => ({
+      background: colors.background,
+      card: colors.card,
+      text: colors.text,
+      muted: colors.textMuted,
+      border: colors.border,
+      primary: colors.primary ?? "#2563EB",
+      secondary: isDark ? "rgba(255,255,255,0.08)" : "#EEF2FF",
+      shadow: isDark ? "rgba(0,0,0,0.45)" : "rgba(15,23,42,0.08)",
+      surfaceMuted: isDark ? "rgba(148,163,184,0.15)" : "#E0EAFF",
+    }),
+    [colors, isDark]
+  );
+  const styles = useMemo(() => createStyles(palette), [palette]);
   const incomeSubtypeLabels: Record<"salary" | "stipend" | "other", string> = {
     salary: "Maaş",
     stipend: "Stipendiya",
@@ -334,8 +341,8 @@ export default function TransactionsScreen() {
     return (
       <View key={cat.id} style={styles.categoryCard}>
         <View style={styles.categoryHeader}>
-          <View style={[styles.categoryIcon, { backgroundColor: cat.color ?? COLORS.secondary }]}>
-            <Ionicons name={(cat.icon as any) || "pricetag-outline"} size={18} color="#1E1E1E" />
+          <View style={[styles.categoryIcon, { backgroundColor: cat.color ?? palette.secondary }]}>
+            <Ionicons name={(cat.icon as any) || "pricetag-outline"} size={18} color={palette.text} />
           </View>
           <Text style={styles.categoryTitle}>{cat.name}</Text>
         </View>
@@ -387,7 +394,7 @@ export default function TransactionsScreen() {
               style={[styles.heroButton, styles.heroButtonSecondary]}
               onPress={() => openTransactionForm("expense")}
             >
-              <Ionicons name="cash-outline" size={18} color={COLORS.primary} />
+              <Ionicons name="cash-outline" size={18} color={palette.primary} />
               <Text style={styles.heroButtonTextSecondary}>Xərc əlavə et</Text>
             </TouchableOpacity>
           </View>
@@ -402,7 +409,7 @@ export default function TransactionsScreen() {
             style={styles.addChip}
             onPress={() => setCategoryModalVisible(true)}
           >
-            <Ionicons name="add" size={18} color={COLORS.primary} />
+            <Ionicons name="add" size={18} color={palette.primary} />
             <Text style={styles.addChipText}>Yeni</Text>
           </TouchableOpacity>
         </View>
@@ -449,7 +456,7 @@ export default function TransactionsScreen() {
               <Text style={styles.sectionSub}>Gəlir və ödənişləri planlaşdır.</Text>
             </View>
             <TouchableOpacity style={styles.addChip} onPress={openReminderModal}>
-              <Ionicons name="calendar-outline" size={16} color={COLORS.primary} />
+              <Ionicons name="calendar-outline" size={16} color={palette.primary} />
               <Text style={styles.addChipText}>Yeni</Text>
             </TouchableOpacity>
           </View>
@@ -460,7 +467,7 @@ export default function TransactionsScreen() {
                   <Ionicons
                     name={reminder.kind === "income" ? "trending-up-outline" : "card-outline"}
                     size={18}
-                    color={COLORS.primary}
+                    color={palette.primary}
                   />
                 </View>
                 <View style={{ flex: 1 }}>
@@ -487,7 +494,7 @@ export default function TransactionsScreen() {
                 {formConfig.type === "income" ? "Gəlir əlavə et" : "Xərc əlavə et"}
               </Text>
               <TouchableOpacity onPress={closeTransactionForm}>
-                <Ionicons name="close" size={24} color={COLORS.text} />
+                <Ionicons name="close" size={24} color={palette.text} />
               </TouchableOpacity>
             </View>
 
@@ -538,7 +545,7 @@ export default function TransactionsScreen() {
                   style={styles.dateChip}
                   onPress={() => setShowDatePicker(true)}
                 >
-                  <Ionicons name="calendar-outline" size={16} color={COLORS.text} />
+                  <Ionicons name="calendar-outline" size={16} color={palette.text} />
                   <Text style={styles.dateChipText}>{reminderLabel(formDate.toISOString())}</Text>
                 </TouchableOpacity>
               </View>
@@ -565,7 +572,7 @@ export default function TransactionsScreen() {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Yeni xatırlatma</Text>
               <TouchableOpacity onPress={closeReminderModal}>
-                <Ionicons name="close" size={24} color={COLORS.text} />
+                <Ionicons name="close" size={24} color={palette.text} />
               </TouchableOpacity>
             </View>
 
@@ -629,7 +636,7 @@ export default function TransactionsScreen() {
                     style={styles.dateChip}
                     onPress={() => setShowReminderStartPicker(true)}
                   >
-                    <Ionicons name="calendar-outline" size={16} color={COLORS.text} />
+                    <Ionicons name="calendar-outline" size={16} color={palette.text} />
                     <Text style={styles.dateChipText}>{reminderLabel(reminderStart.toISOString())}</Text>
                   </TouchableOpacity>
                 </View>
@@ -648,7 +655,7 @@ export default function TransactionsScreen() {
                     style={styles.dateChip}
                     onPress={() => setShowReminderEndPicker(true)}
                   >
-                    <Ionicons name="calendar-outline" size={16} color={COLORS.text} />
+                    <Ionicons name="calendar-outline" size={16} color={palette.text} />
                     <Text style={styles.dateChipText}>{reminderLabel(reminderEnd.toISOString())}</Text>
                   </TouchableOpacity>
                 </View>
@@ -696,7 +703,7 @@ export default function TransactionsScreen() {
                     style={styles.dateChip}
                     onPress={() => setShowReminderDuePicker(true)}
                   >
-                    <Ionicons name="calendar-outline" size={16} color={COLORS.text} />
+                    <Ionicons name="calendar-outline" size={16} color={palette.text} />
                     <Text style={styles.dateChipText}>{reminderLabel(reminderDue.toISOString())}</Text>
                   </TouchableOpacity>
                 </View>
@@ -728,7 +735,7 @@ export default function TransactionsScreen() {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Yeni kateqoriya</Text>
               <TouchableOpacity onPress={() => setCategoryModalVisible(false)}>
-                <Ionicons name="close" size={24} color={COLORS.text} />
+                <Ionicons name="close" size={24} color={palette.text} />
               </TouchableOpacity>
             </View>
 
@@ -791,197 +798,212 @@ export default function TransactionsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: COLORS.background },
-  scroll: { padding: 20, paddingBottom: 120 },
-  hero: {
-    backgroundColor: COLORS.card,
-    borderRadius: 20,
-    padding: 20,
-    shadowColor: "#1F2933",
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 2,
-  },
-  heroTitle: { fontSize: 22, fontWeight: "800", color: COLORS.text },
-  heroSub: { color: COLORS.muted, marginTop: 6 },
-  heroActions: { flexDirection: "row", marginTop: 18, gap: 12, flexWrap: "wrap" },
-  heroButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    borderRadius: 14,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-  },
-  heroButtonPrimary: { backgroundColor: COLORS.primary },
-  heroButtonSecondary: { backgroundColor: COLORS.secondary },
-  heroButtonTextPrimary: { color: "#fff", fontWeight: "700" },
-  heroButtonTextSecondary: { color: COLORS.primary, fontWeight: "700" },
-  sectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginTop: 28,
-  },
-  sectionTitle: { fontSize: 16, fontWeight: "700", color: COLORS.text },
-  sectionSub: { fontSize: 12, color: COLORS.muted, marginTop: 4 },
-  addChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    backgroundColor: "#E0EAFF",
-  },
-  addChipText: { color: COLORS.primary, fontWeight: "600" },
-  categoryGrid: { flexDirection: "row", flexWrap: "wrap", gap: 12, marginTop: 16 },
-  categoryCard: {
-    width: "48%",
-    backgroundColor: COLORS.card,
-    borderRadius: 18,
-    padding: 16,
-    shadowColor: "#0F172A",
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 1,
-  },
-  categoryHeader: { flexDirection: "row", alignItems: "center", gap: 10 },
-  categoryIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  categoryTitle: { fontWeight: "700", color: COLORS.text },
-  categoryMeta: { marginTop: 8, color: COLORS.muted, fontSize: 12 },
-  progressTrack: {
-    marginTop: 10,
-    height: 6,
-    borderRadius: 999,
-    backgroundColor: COLORS.border,
-  },
-  progressFill: {
-    height: 6,
-    borderRadius: 999,
-    backgroundColor: COLORS.primary,
-  },
-  spacer: { height: 12 },
-  cardButton: {
-    marginTop: 12,
-    backgroundColor: COLORS.primary,
-    borderRadius: 12,
-    paddingVertical: 10,
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 6,
-  },
-  cardButtonText: { color: "#fff", fontWeight: "600" },
-  incomePillSection: { marginTop: 28 },
-  pill: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 999,
-    backgroundColor: "#E5E7EB",
-    marginRight: 10,
-  },
-  pillActive: { backgroundColor: COLORS.primary },
-  pillText: { color: COLORS.text, fontWeight: "600" },
-  pillTextActive: { color: "#fff" },
-  reminderCard: {
-    marginTop: 30,
-    backgroundColor: COLORS.card,
-    borderRadius: 20,
-    padding: 20,
-    shadowColor: "#1F2937",
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    elevation: 2,
-  },
-  reminderRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: COLORS.border,
-  },
-  reminderIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    backgroundColor: COLORS.secondary,
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 12,
-  },
-  reminderTitle: { fontWeight: "600", color: COLORS.text },
-  reminderMeta: { color: COLORS.muted, fontSize: 12, marginTop: 2 },
-  emptyText: { textAlign: "center", color: COLORS.muted, marginTop: 12 },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: "rgba(15, 23, 42, 0.35)",
-    justifyContent: "flex-end",
-    padding: 16,
-  },
-  modalCard: {
-    backgroundColor: "#fff",
-    borderRadius: 20,
-    padding: 20,
-  },
-  modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  modalTitle: { fontSize: 18, fontWeight: "700", color: COLORS.text },
-  modalLabel: { fontSize: 13, fontWeight: "600", color: COLORS.muted, marginTop: 8 },
-  input: {
-    marginTop: 8,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    paddingHorizontal: 12,
-    height: 44,
-    color: COLORS.text,
-  },
-  dateRow: {
-    marginTop: 18,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  dateChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: COLORS.secondary,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 999,
-  },
-  dateChipText: { color: COLORS.text, fontWeight: "600" },
-  submitBtn: {
-    backgroundColor: COLORS.primary,
-    borderRadius: 14,
-    paddingVertical: 14,
-    marginTop: 20,
-    alignItems: "center",
-  },
-  submitText: { color: "#fff", fontWeight: "700", fontSize: 16 },
-  toggleRow: {
-    flexDirection: "row",
-    marginTop: 12,
-    gap: 10,
-  },
-  toggleChip: {
-    flex: 1,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    paddingVertical: 10,
-    alignItems: "center",
-  },
-  toggleChipActive: { borderColor: COLORS.primary, backgroundColor: COLORS.secondary },
-  toggleChipText: { color: COLORS.muted, fontWeight: "600" },
-  toggleChipTextActive: { color: COLORS.primary },
-  reminderInfo: { marginTop: 14, fontSize: 12, color: COLORS.muted },
-});
+const createStyles = (theme: TransactionsPalette) =>
+  StyleSheet.create({
+    safe: { flex: 1, backgroundColor: theme.background },
+    scroll: { padding: 20, paddingBottom: 120 },
+    hero: {
+      backgroundColor: theme.card,
+      borderRadius: 20,
+      padding: 20,
+      shadowColor: theme.shadow,
+      shadowOpacity: 0.08,
+      shadowRadius: 12,
+      elevation: 2,
+    },
+    heroTitle: { fontSize: 22, fontWeight: "800", color: theme.text },
+    heroSub: { color: theme.muted, marginTop: 6 },
+    heroActions: { flexDirection: "row", marginTop: 18, gap: 12, flexWrap: "wrap" },
+    heroButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      borderRadius: 14,
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+    },
+    heroButtonPrimary: { backgroundColor: theme.primary },
+    heroButtonSecondary: { backgroundColor: theme.secondary },
+    heroButtonTextPrimary: { color: "#fff", fontWeight: "700" },
+    heroButtonTextSecondary: { color: theme.primary, fontWeight: "700" },
+    sectionHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginTop: 28,
+    },
+    sectionTitle: { fontSize: 16, fontWeight: "700", color: theme.text },
+    sectionSub: { fontSize: 12, color: theme.muted, marginTop: 4 },
+    addChip: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      borderRadius: 999,
+      paddingHorizontal: 14,
+      paddingVertical: 6,
+      backgroundColor: theme.surfaceMuted,
+    },
+    addChipText: { color: theme.primary, fontWeight: "600" },
+    categoryGrid: { flexDirection: "row", flexWrap: "wrap", gap: 12, marginTop: 16 },
+    categoryCard: {
+      width: "48%",
+      backgroundColor: theme.card,
+      borderRadius: 18,
+      padding: 16,
+      shadowColor: theme.shadow,
+      shadowOpacity: 0.05,
+      shadowRadius: 8,
+      elevation: 1,
+    },
+    categoryHeader: { flexDirection: "row", alignItems: "center", gap: 10 },
+    categoryIcon: {
+      width: 36,
+      height: 36,
+      borderRadius: 12,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    categoryTitle: { fontWeight: "700", color: theme.text },
+    categoryMeta: { marginTop: 8, color: theme.muted, fontSize: 12 },
+    progressTrack: {
+      marginTop: 10,
+      height: 6,
+      borderRadius: 999,
+      backgroundColor: theme.border,
+    },
+    progressFill: {
+      height: 6,
+      borderRadius: 999,
+      backgroundColor: theme.primary,
+    },
+    spacer: { height: 12 },
+    cardButton: {
+      marginTop: 12,
+      backgroundColor: theme.primary,
+      borderRadius: 12,
+      paddingVertical: 10,
+      flexDirection: "row",
+      justifyContent: "center",
+      alignItems: "center",
+      gap: 6,
+    },
+    cardButtonText: { color: "#fff", fontWeight: "600" },
+    incomePillSection: { marginTop: 28 },
+    pill: {
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      borderRadius: 999,
+      backgroundColor: theme.secondary,
+      marginRight: 10,
+    },
+    pillActive: { backgroundColor: theme.primary },
+    pillText: { color: theme.text, fontWeight: "600" },
+    pillTextActive: { color: "#fff" },
+    reminderCard: {
+      marginTop: 30,
+      backgroundColor: theme.card,
+      borderRadius: 20,
+      padding: 20,
+      shadowColor: theme.shadow,
+      shadowOpacity: 0.06,
+      shadowRadius: 10,
+      elevation: 2,
+    },
+    reminderRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingVertical: 10,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: theme.border,
+    },
+    reminderIcon: {
+      width: 36,
+      height: 36,
+      borderRadius: 12,
+      backgroundColor: theme.secondary,
+      alignItems: "center",
+      justifyContent: "center",
+      marginRight: 12,
+    },
+    reminderTitle: { fontWeight: "600", color: theme.text },
+    reminderMeta: { color: theme.muted, fontSize: 12, marginTop: 2 },
+    emptyText: { textAlign: "center", color: theme.muted, marginTop: 12 },
+    modalBackdrop: {
+      flex: 1,
+      backgroundColor: "rgba(15, 23, 42, 0.35)",
+      justifyContent: "flex-end",
+      padding: 16,
+    },
+    modalCard: {
+      backgroundColor: theme.card,
+      borderRadius: 20,
+      padding: 20,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.border,
+    },
+    modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+    modalTitle: { fontSize: 18, fontWeight: "700", color: theme.text },
+    modalLabel: { fontSize: 13, fontWeight: "600", color: theme.muted, marginTop: 8 },
+    input: {
+      marginTop: 8,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: theme.border,
+      paddingHorizontal: 12,
+      height: 44,
+      color: theme.text,
+    },
+    dateRow: {
+      marginTop: 18,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+    dateChip: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      backgroundColor: theme.secondary,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 999,
+    },
+    dateChipText: { color: theme.text, fontWeight: "600" },
+    submitBtn: {
+      backgroundColor: theme.primary,
+      borderRadius: 14,
+      paddingVertical: 14,
+      marginTop: 20,
+      alignItems: "center",
+    },
+    submitText: { color: "#fff", fontWeight: "700", fontSize: 16 },
+    toggleRow: {
+      flexDirection: "row",
+      marginTop: 12,
+      gap: 10,
+    },
+    toggleChip: {
+      flex: 1,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: theme.border,
+      paddingVertical: 10,
+      alignItems: "center",
+    },
+    toggleChipActive: { borderColor: theme.primary, backgroundColor: theme.secondary },
+    toggleChipText: { color: theme.muted, fontWeight: "600" },
+    toggleChipTextActive: { color: theme.primary },
+    reminderInfo: { marginTop: 14, fontSize: 12, color: theme.muted },
+  });
+
+type TransactionsPalette = {
+  background: string;
+  card: string;
+  text: string;
+  muted: string;
+  border: string;
+  primary: string;
+  secondary: string;
+  shadow: string;
+  surfaceMuted: string;
+};

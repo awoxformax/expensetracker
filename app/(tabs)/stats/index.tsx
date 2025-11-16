@@ -15,19 +15,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTransactions } from "../../../src/context/TransactionsContext";
-
-/** ----- Dizayn rəngləri (light) ----- */
-const C = {
-  bg: "#F6F7FB",
-  card: "#FFFFFF",
-  text: "#0F172A",
-  muted: "#64748B",
-  border: "#E5E7EB",
-  blue: "#357BFF",
-  red: "#FF6B6B",
-  green: "#00C897",
-  shadow: "rgba(15,23,42,0.08)",
-};
+import { useTheme } from "../../../src/theme/ThemeProvider";
 
 const MONTH_LABEL = (d: Date) =>
   d.toLocaleString("en-US", { month: "long" }); // label üçün (Azərbaycan dilinə çevirmək istəyərsən: 'az-AZ')
@@ -41,6 +29,36 @@ export default function StatsScreen() {
   const router = useRouter();
   const { height: screenHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  const { colors, isDark } = useTheme();
+  const palette = useMemo(
+    () => ({
+      background: colors.background,
+      surface: colors.card,
+      card: colors.card,
+      text: colors.text,
+      muted: colors.textMuted,
+      border: colors.border,
+      chip: isDark ? "rgba(255,255,255,0.08)" : "#EEF2FF",
+      handle: isDark ? "rgba(148,163,184,0.4)" : "#D1D5DB",
+      accent: colors.primary ?? "#4F8BFF",
+      shadow: isDark ? "rgba(0,0,0,0.45)" : "rgba(15,23,42,0.08)",
+      barBase: isDark ? "rgba(255,255,255,0.12)" : "#EBEEF5",
+      income: "#10B981",
+      expense: "#EF4444",
+    }),
+    [colors, isDark]
+  );
+  const st = useMemo(() => createStyles(palette), [palette]);
+  const textColor = palette.text;
+  const mutedColor = palette.muted;
+  const cardBg = palette.card;
+  const sheetBg = palette.card;
+  const borderColor = palette.border;
+  const barBaseColor = palette.barBase;
+  const shadowColor = palette.shadow;
+  const accentColor = palette.accent;
+  const incomeColor = palette.income;
+  const expenseColor = palette.expense;
 
   // ay seçimi
   const [cursorDate, setCursorDate] = useState(() => new Date());
@@ -151,34 +169,34 @@ export default function StatsScreen() {
   );
 
   return (
-    <SafeAreaView style={st.safe}>
-      <View style={[st.topSection, { paddingTop: topPadding }]} onLayout={handleTopLayout}>
+    <SafeAreaView style={[st.safe, { paddingTop: topPadding }]}>
+      <View style={st.topSection} onLayout={handleTopLayout}>
         {/* Header / Month selector */}
         <View style={st.header}>
           <TouchableOpacity onPress={() => changeMonth(-1)} style={st.monthBtn}>
-            <Ionicons name="chevron-back" size={20} color={C.text} />
+            <Ionicons name="chevron-back" size={20} color={textColor} />
           </TouchableOpacity>
 
           <View style={st.monthPill}>
-            <Text style={st.monthTxt}>{MONTH_LABEL(cursorDate)}</Text>
+            <Text style={[st.monthTxt, { color: textColor }]}>{MONTH_LABEL(cursorDate)}</Text>
           </View>
 
           <TouchableOpacity onPress={() => changeMonth(1)} style={st.monthBtn}>
-            <Ionicons name="chevron-forward" size={20} color={C.text} />
+            <Ionicons name="chevron-forward" size={20} color={textColor} />
           </TouchableOpacity>
         </View>
 
         {/* Top summary (expenses / income) */}
         <View style={st.summaryRow}>
-          <View style={st.summaryCol}>
-            <Text style={st.sLabel}>Expenses</Text>
-            <Text style={[st.sValue, { color: C.red }]}>
+          <View style={[st.summaryCol, { backgroundColor: cardBg, shadowColor }]}>
+            <Text style={[st.sLabel, { color: mutedColor }]}>Expenses</Text>
+            <Text style={[st.sValue, { color: expenseColor }]}>
               {expense.toFixed(2)} ₼
             </Text>
           </View>
-          <View style={st.summaryCol}>
-            <Text style={st.sLabel}>Income</Text>
-            <Text style={[st.sValue, { color: C.green }]}>
+          <View style={[st.summaryCol, { backgroundColor: cardBg, shadowColor }]}>
+            <Text style={[st.sLabel, { color: mutedColor }]}>Income</Text>
+            <Text style={[st.sValue, { color: incomeColor }]}>
               {income.toFixed(2)} ₼
             </Text>
           </View>
@@ -194,7 +212,7 @@ export default function StatsScreen() {
               activeOpacity={0.8}
             >
               <Text style={st.detailText}>Detallar</Text>
-              <Ionicons name="arrow-forward-circle" size={18} color={C.blue} />
+              <Ionicons name="arrow-forward-circle" size={18} color={accentColor} />
             </TouchableOpacity>
           </View>
 
@@ -202,15 +220,15 @@ export default function StatsScreen() {
             {/* Income column */}
             <View style={st.barWrap}>
               <Text style={st.barLabel}>Gəlir</Text>
-              <View style={st.barBase}>
+              <View style={[st.barBase, { backgroundColor: barBaseColor }]}>
                 <Animated.View
                   style={[
                     st.bar,
-                    { backgroundColor: C.blue, height: incomeH },
+                    { backgroundColor: accentColor, height: incomeH },
                   ]}
                 />
               </View>
-              <Text style={[st.barAmount, { color: C.blue }]}>
+              <Text style={[st.barAmount, { color: accentColor }]}>
                 {income.toFixed(2)} AZN
               </Text>
             </View>
@@ -218,15 +236,15 @@ export default function StatsScreen() {
             {/* Expense column */}
             <View style={st.barWrap}>
               <Text style={st.barLabel}>Xərc</Text>
-              <View style={st.barBase}>
+              <View style={[st.barBase, { backgroundColor: barBaseColor }]}>
                 <Animated.View
                   style={[
                     st.bar,
-                    { backgroundColor: C.red, height: expenseH },
+                    { backgroundColor: expenseColor, height: expenseH },
                   ]}
                 />
               </View>
-              <Text style={[st.barAmount, { color: C.red }]}>
+              <Text style={[st.barAmount, { color: expenseColor }]}>
                 {expense.toFixed(2)} AZN
               </Text>
             </View>
@@ -242,6 +260,8 @@ export default function StatsScreen() {
             height: sheetHeight,
             borderTopLeftRadius: sheetRadius,
             borderTopRightRadius: sheetRadius,
+            backgroundColor: sheetBg,
+            shadowColor,
           },
         ]}
       >
@@ -269,7 +289,7 @@ export default function StatsScreen() {
                 <Ionicons
                   name={item.type === "income" ? "arrow-down-circle" : "arrow-up-circle"}
                   size={20}
-                  color={item.type === "income" ? C.green : C.red}
+                  color={item.type === "income" ? incomeColor : expenseColor}
                 />
               </View>
               <View style={{ flex: 1 }}>
@@ -286,20 +306,20 @@ export default function StatsScreen() {
                   })}
                 </Text>
               </View>
-              <Text
-                style={[
-                  st.txAmount,
-                  { color: item.type === "income" ? C.green : C.red },
-                ]}
-              >
-                {item.type === "income" ? "+" : "-"}
-                {Math.abs(item.amount).toFixed(2)}
-              </Text>
+                <Text
+                  style={[
+                    st.txAmount,
+                    { color: item.type === "income" ? incomeColor : expenseColor },
+                  ]}
+                >
+                  {item.type === "income" ? "+" : "-"}
+                  {Math.abs(item.amount).toFixed(2)}
+                </Text>
             </View>
           )}
           ListEmptyComponent={
-            <View style={{ padding: 16 }}>
-              <Text style={{ textAlign: "center", color: C.muted }}>
+            <View style={st.emptyState}>
+              <Text style={st.emptyStateText}>
                 {loading ? "Yüklənir..." : "Hələ əməliyyat yoxdur."}
               </Text>
             </View>
@@ -311,162 +331,175 @@ export default function StatsScreen() {
 }
 
 /* -------------------- STYLES -------------------- */
-const st = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: C.bg },
-  topSection: {
-    paddingBottom: 4,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 0,
-    paddingTop: 6,
-    gap: 12,
-    alignSelf: "center",
-    width: "80%",
-  },
-  monthBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: C.card,
-    alignItems: "center",
-    justifyContent: "center",
-    elevation: 2,
-    shadowColor: C.shadow,
-  },
-  monthPill: {
-    paddingHorizontal: 18,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: C.card,
-    alignItems: "center",
-    justifyContent: "center",
-    elevation: 2,
-    shadowColor: C.shadow,
-    minWidth: 120,
-    maxWidth: 200,
-    flexShrink: 1,
-  },
-  monthTxt: { fontSize: 14, fontWeight: "700", color: C.text, textAlign: "center" },
+const createStyles = (theme: StatsPalette) =>
+  StyleSheet.create({
+    safe: { flex: 1, backgroundColor: theme.background },
+    topSection: { paddingBottom: 4, backgroundColor: theme.background },
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: 0,
+      paddingTop: 6,
+      gap: 12,
+      alignSelf: "center",
+      width: "80%",
+    },
+    monthBtn: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: theme.chip,
+      alignItems: "center",
+      justifyContent: "center",
+      elevation: 2,
+      shadowColor: theme.shadow,
+    },
+    monthPill: {
+      paddingHorizontal: 18,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: theme.surface,
+      alignItems: "center",
+      justifyContent: "center",
+      elevation: 2,
+      shadowColor: theme.shadow,
+      minWidth: 120,
+      maxWidth: 200,
+      flexShrink: 1,
+    },
+    monthTxt: { fontSize: 14, fontWeight: "700", color: theme.text, textAlign: "center" },
+    summaryRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      paddingHorizontal: 20,
+      marginTop: 12,
+    },
+    summaryCol: {
+      width: "48%",
+      backgroundColor: theme.card,
+      borderRadius: 14,
+      padding: 14,
+      elevation: 2,
+      shadowColor: theme.shadow,
+    },
+    sLabel: { fontSize: 12, color: theme.muted, marginBottom: 4 },
+    sValue: { fontSize: 18, fontWeight: "800", color: theme.text },
+    card: {
+      marginTop: 14,
+      marginHorizontal: 16,
+      backgroundColor: theme.card,
+      borderRadius: 16,
+      padding: 16,
+      elevation: 3,
+      shadowColor: theme.shadow,
+    },
+    cardHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+    cardTitle: { fontSize: 16, fontWeight: "700", color: theme.text },
+    detailBtn: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 999,
+      backgroundColor: theme.chip,
+    },
+    detailText: { color: theme.accent, fontWeight: "600", fontSize: 12 },
+    chartArea: {
+      flexDirection: "row",
+      justifyContent: "space-evenly",
+      alignItems: "flex-end",
+      paddingVertical: 18,
+    },
+    barWrap: { alignItems: "center", width: 120 },
+    barLabel: { fontSize: 12, color: theme.muted, marginBottom: 6 },
+    barBase: {
+      width: 48,
+      height: 160,
+      borderRadius: 12,
+      backgroundColor: theme.barBase,
+      overflow: "hidden",
+      justifyContent: "flex-end",
+    },
+    bar: {
+      width: "100%",
+      borderRadius: 12,
+    },
+    barAmount: {
+      marginTop: 8,
+      fontWeight: "700",
+      fontSize: 13,
+      color: theme.text,
+    },
+    sheet: {
+      marginTop: 14,
+      backgroundColor: theme.card,
+      borderTopLeftRadius: 16,
+      borderTopRightRadius: 16,
+      overflow: "hidden",
+      elevation: 8,
+      shadowColor: theme.shadow,
+    },
+    sheetHandle: {
+      paddingTop: 10,
+      paddingBottom: 12,
+      paddingHorizontal: 16,
+      alignItems: "center",
+      gap: 6,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: theme.border,
+    },
+    handleBar: {
+      width: 40,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: theme.handle,
+    },
+    sheetTitle: { fontWeight: "700", color: theme.text, marginTop: 4 },
+    tag: {
+      backgroundColor: theme.chip,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: 999,
+    },
+    tagTxt: { fontSize: 12, color: theme.text },
+    txRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: theme.border,
+    },
+    txIconWrap: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: theme.chip,
+      alignItems: "center",
+      justifyContent: "center",
+      marginRight: 12,
+    },
+    txTitle: { color: theme.text, fontWeight: "600" },
+    txMeta: { color: theme.muted, fontSize: 12, marginTop: 2 },
+    txAmount: { fontWeight: "700", marginLeft: 10, color: theme.text },
+    emptyState: { padding: 16 },
+    emptyStateText: { textAlign: "center", color: theme.muted },
+  });
 
-  summaryRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    marginTop: 12,
-  },
-  summaryCol: {
-    width: "48%",
-    backgroundColor: C.card,
-    borderRadius: 14,
-    padding: 14,
-    elevation: 2,
-    shadowColor: C.shadow,
-  },
-  sLabel: { fontSize: 12, color: C.muted, marginBottom: 4 },
-  sValue: { fontSize: 18, fontWeight: "800" },
-
-  card: {
-    marginTop: 14,
-    marginHorizontal: 16,
-    backgroundColor: C.card,
-    borderRadius: 16,
-    padding: 16,
-    elevation: 3,
-    shadowColor: C.shadow,
-  },
-  cardHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  cardTitle: { fontSize: 16, fontWeight: "700", color: C.text },
-  detailBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: "#EEF2FF",
-  },
-  detailText: { color: C.blue, fontWeight: "600", fontSize: 12 },
-
-  chartArea: {
-    flexDirection: "row",
-    justifyContent: "space-evenly",
-    alignItems: "flex-end",
-    paddingVertical: 18,
-  },
-  barWrap: { alignItems: "center", width: 120 },
-  barLabel: { fontSize: 12, color: C.muted, marginBottom: 6 },
-  barBase: {
-    width: 48,
-    height: 160,
-    borderRadius: 12,
-    backgroundColor: "#EBEEF5",
-    overflow: "hidden",
-    justifyContent: "flex-end",
-  },
-  bar: {
-    width: "100%",
-    borderRadius: 12,
-  },
-  barAmount: {
-    marginTop: 8,
-    fontWeight: "700",
-    fontSize: 13,
-  },
-
-  sheet: {
-    marginTop: 14,
-    backgroundColor: C.card,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    overflow: "hidden",
-    elevation: 8,
-    shadowColor: C.shadow,
-  },
-  sheetHandle: {
-    paddingTop: 10,
-    paddingBottom: 12,
-    paddingHorizontal: 16,
-    alignItems: "center",
-    gap: 6,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: C.border,
-  },
-  handleBar: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: "#D1D5DB",
-  },
-  sheetTitle: { fontWeight: "700", color: C.text, marginTop: 4 },
-  tag: {
-    backgroundColor: "#F3F4F6",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
-  },
-  tagTxt: { fontSize: 12, color: C.muted },
-
-  txRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: C.border,
-  },
-  txIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "#F3F4F6",
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 12,
-  },
-  txTitle: { color: C.text, fontWeight: "600" },
-  txMeta: { color: C.muted, fontSize: 12, marginTop: 2 },
-  txAmount: { fontWeight: "700", marginLeft: 10 },
-});
+type StatsPalette = {
+  background: string;
+  surface: string;
+  card: string;
+  text: string;
+  muted: string;
+  border: string;
+  chip: string;
+  handle: string;
+  accent: string;
+  shadow: string;
+  barBase: string;
+  income: string;
+  expense: string;
+};

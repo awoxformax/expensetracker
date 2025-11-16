@@ -4,7 +4,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { View, StyleSheet } from "react-native";
 import { useTheme } from "../../src/theme/ThemeProvider";
 import { useLang } from "../../src/context/LangContext";
-import { t } from "../../src/data/strings";
 
 const ACTIVE_COLOR = "rgba(37,99,235,0.95)";
 const INACTIVE_COLOR = "rgba(156,163,175,0.7)";
@@ -16,12 +15,12 @@ const ICONS: Record<
   home: { active: "home", inactive: "home-outline" },
   stats: { active: "stats-chart", inactive: "stats-chart-outline" },
   transactions: { active: "swap-horizontal", inactive: "swap-horizontal-outline" },
-  more: { active: "apps", inactive: "apps-outline" },
+  more: { active: "person-circle", inactive: "person-circle-outline" },
 };
 
 export default function TabsLayout() {
-  const { fonts, isDark } = useTheme();
-  const { lang } = useLang();
+  const { fonts, isDark, colors } = useTheme();
+  const { lang, t } = useLang();
 
   return (
     <Tabs
@@ -31,6 +30,7 @@ export default function TabsLayout() {
         tabBarShowLabel: true,
         tabBarActiveTintColor: ACTIVE_COLOR,
         tabBarInactiveTintColor: INACTIVE_COLOR,
+        sceneContainerStyle: { backgroundColor: colors.background },
         tabBarStyle: [
           styles.tabBar,
           { backgroundColor: isDark ? "#111827" : "rgba(249,250,251,0.97)" },
@@ -45,23 +45,24 @@ export default function TabsLayout() {
           includeFontPadding: false,
           fontFamily: fonts.body,
         },
-        tabBarIcon: ({ color, focused }) => (
-          <TabIcon
-            iconName={
-              (focused
-                ? ICONS[route.name]?.active
-                : ICONS[route.name]?.inactive) ?? "ellipse"
-            }
-            color={color}
-            focused={focused}
-          />
-        ),
+        tabBarIcon: ({ color, focused }) => {
+          const baseName = route.name.split("/")[0];
+          const iconSet = ICONS[baseName] ?? ICONS[route.name];
+          const iconName = focused ? iconSet?.active : iconSet?.inactive;
+          return (
+            <TabIcon
+              iconName={iconName ?? "ellipse"}
+              color={color}
+              focused={focused}
+            />
+          );
+        },
       })}
     >
-      <Tabs.Screen name="home" options={{ title: t("home", lang) }} />
-      <Tabs.Screen name="stats" options={{ title: t("statistics", lang) }} />
-      <Tabs.Screen name="transactions" options={{ title: t("transactions", lang) }} />
-      <Tabs.Screen name="more" options={{ title: t("more", lang) }} />
+      <Tabs.Screen name="home" options={{ title: t("tabs_home") }} />
+      <Tabs.Screen name="stats" options={{ title: t("tabs_statistics") }} />
+      <Tabs.Screen name="transactions" options={{ title: t("tabs_transactions") }} />
+      <Tabs.Screen name="more" options={{ title: t("tabs_more") }} />
     </Tabs>
   );
 }

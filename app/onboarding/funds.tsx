@@ -8,6 +8,7 @@ import { useOnboarding } from '../../src/context/Onboarding';
 import { useUser } from '../../src/context/UserContext';
 import { ONBOARDING_DONE_KEY } from '../../src/constants/storage';
 import { ONBOARDING_CATEGORIES } from '../../src/data/onboardingCategories';
+import { PRE_HOME_BACKGROUND } from '../../src/constants/ui';
 
 const toNumber = (value: string): number | null => {
   const normalized = value.replace(/,/g, '.').replace(/[^\d.]/g, '');
@@ -84,7 +85,7 @@ export default function FundsScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
+    <SafeAreaView style={styles.safe}>
       <View style={styles.content}>
         <Text style={[styles.title, { color: '#F8FAFF', fontFamily: fonts.heading }]}>Büdcəni planlayaq</Text>
         <Text style={[styles.subtitle, { color: '#A5B4FC', fontFamily: fonts.body }]}>
@@ -154,6 +155,7 @@ const styles = StyleSheet.create({
   safe: {
     flex: 1,
     padding: 24,
+    backgroundColor: PRE_HOME_BACKGROUND,
   },
   content: {
     flex: 1,
@@ -205,4 +207,3 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 });
-

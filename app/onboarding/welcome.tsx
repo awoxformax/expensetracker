@@ -3,13 +3,14 @@ import { Text, View, StyleSheet, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTheme } from '../../src/theme/ThemeProvider';
+import { PRE_HOME_BACKGROUND } from '../../src/constants/ui';
 
 export default function WelcomeScreen() {
   const router = useRouter();
   const { colors, fonts } = useTheme();
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
+    <SafeAreaView style={styles.safe}>
       <View style={styles.container}>
         <Text style={[styles.badge, { color: '#A5B4FC', borderColor: '#323B55', fontFamily: fonts.heading }]}>Expense Tracker</Text>
         <Text style={[styles.title, { color: '#F8FAFF', fontFamily: fonts.heading }]}>Xoş gəldin! 👋</Text>
@@ -39,6 +40,7 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 24,
     justifyContent: 'space-between',
+    backgroundColor: PRE_HOME_BACKGROUND,
   },
   container: {
     marginTop: 60,
@@ -73,4 +75,3 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 });
-

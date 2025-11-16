@@ -6,6 +6,7 @@ import { useRouter } from 'expo-router';
 import { useTheme } from '../../src/theme/ThemeProvider';
 import { useOnboarding } from '../../src/context/Onboarding';
 import { ONBOARDING_CATEGORIES } from '../../src/data/onboardingCategories';
+import { PRE_HOME_BACKGROUND } from '../../src/constants/ui';
 
 export default function CategorySelectScreen() {
   const router = useRouter();
@@ -20,7 +21,7 @@ export default function CategorySelectScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
+    <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <Text style={[styles.title, { color: '#F8FAFF', fontFamily: fonts.heading }]}>Kateqoriyalarını seç</Text>
         <Text style={[styles.subtitle, { color: '#A5B4FC', fontFamily: fonts.body }]}>
@@ -105,6 +106,7 @@ const styles = StyleSheet.create({
   safe: {
     flex: 1,
     padding: 24,
+    backgroundColor: PRE_HOME_BACKGROUND,
   },
   scroll: {
     paddingBottom: 140,
@@ -167,4 +169,3 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 });
-

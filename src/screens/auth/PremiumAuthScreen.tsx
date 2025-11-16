@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  Alert,
   Animated,
   ImageBackground,
   KeyboardAvoidingView,
@@ -113,6 +114,12 @@ export default function PremiumAuthScreen({ mode }: PremiumAuthScreenProps) {
     setSubmitting(true);
     const trimmedEmail = email.trim();
     const trimmedName = fullName.trim();
+    const emailValid = /\S+@\S+\.\S+/.test(trimmedEmail);
+    if (!emailValid) {
+      Alert.alert("Xəta", "Zəhmət olmasa düzgün email ünvanı daxil et.");
+      setSubmitting(false);
+      return;
+    }
     let success = false;
     if (mode === "login") {
       success = await login(trimmedEmail, password);

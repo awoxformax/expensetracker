@@ -8,6 +8,9 @@ import { useOnboarding } from '../../src/context/Onboarding';
 import { ONBOARDING_DONE_KEY } from '../../src/constants/storage';
 import { ONBOARDING_CATEGORIES } from '../../src/data/onboardingCategories';
 import { useUser } from '../../src/context/UserContext';
+import { PRE_HOME_BACKGROUND } from '../../src/constants/ui';
+import { PIN_KEY } from '../../src/constants/security';
+import { getItem } from '../../src/lib/storage';
 
 export default function DoneScreen() {
   const router = useRouter();
@@ -49,15 +52,20 @@ export default function DoneScreen() {
       }
       completePhase1();
       await AsyncStorage.setItem(ONBOARDING_DONE_KEY, 'true');
+      const storedPin = await getItem<string | null>(PIN_KEY, null);
       reset();
-      router.replace('/(tabs)/home');
+      if (!storedPin || storedPin.length < 4) {
+        router.replace('/pin-setup');
+      } else {
+        router.replace('/(tabs)/home');
+      }
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
+    <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Text style={[styles.title, { color: '#F8FAFF', fontFamily: fonts.heading }]}>Hazırsan! 🎉</Text>
         <Text style={[styles.subtitle, { color: '#A5B4FC', fontFamily: fonts.body }]}>
@@ -126,6 +134,7 @@ const styles = StyleSheet.create({
   safe: {
     flex: 1,
     padding: 24,
+    backgroundColor: PRE_HOME_BACKGROUND,
   },
   content: {
     paddingBottom: 160,

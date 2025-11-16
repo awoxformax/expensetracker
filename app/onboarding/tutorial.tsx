@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
-import { Image, Text, View, StyleSheet, Dimensions, Pressable } from 'react-native';
-import Swiper from 'react-native-swiper';
+import React, { useRef, useState } from 'react';
+import { Image, Text, View, StyleSheet, Dimensions, Pressable, ScrollView, NativeSyntheticEvent, NativeScrollEvent } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTheme } from '../../src/theme/ThemeProvider';
+import { PRE_HOME_BACKGROUND } from '../../src/constants/ui';
 
 const { width } = Dimensions.get('window');
 
@@ -35,32 +35,47 @@ export default function TutorialScreen() {
   const [index, setIndex] = useState(0);
   const router = useRouter();
   const { colors, fonts } = useTheme();
+  const scrollRef = useRef<ScrollView>(null);
 
   const handleContinue = () => {
+    if (index < slides.length - 1) {
+      scrollRef.current?.scrollTo({ x: (index + 1) * width, animated: true });
+      return;
+    }
     router.replace('/onboarding/welcome');
   };
 
+  const onMomentumEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const offset = event.nativeEvent.contentOffset.x;
+    const nextIndex = Math.round(offset / width);
+    setIndex(nextIndex);
+  };
+
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
+    <SafeAreaView style={styles.safe}>
       <View style={styles.wrapper}>
         <View style={styles.carousel}>
-          <Swiper
-            style={styles.swiper}
-            loop={false}
-            showsButtons={false}
-            onIndexChanged={setIndex}
-            dot={<View style={styles.dot} />}
-            activeDot={<View style={[styles.dot, styles.dotActive]} />}
-            paginationStyle={styles.pagination}
+          <ScrollView
+            ref={scrollRef}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            onMomentumScrollEnd={onMomentumEnd}
+            scrollEventThrottle={16}
           >
             {slides.map(slide => (
-              <View key={slide.title} style={styles.slide}>
+              <View key={slide.title} style={[styles.slide, { width }]}>
                 <Image source={slide.image} resizeMode="contain" style={styles.slideImage} />
                 <Text style={[styles.slideTitle, { color: '#F8FAFF', fontFamily: fonts.heading }]}>{slide.title}</Text>
                 <Text style={[styles.slideDescription, { color: '#A5B4FC', fontFamily: fonts.body }]}>{slide.description}</Text>
               </View>
             ))}
-          </Swiper>
+          </ScrollView>
+          <View style={styles.pagination}>
+            {slides.map((_, idx) => (
+              <View key={idx} style={[styles.dot, idx === index && styles.dotActive]} />
+            ))}
+          </View>
         </View>
         <View style={styles.footer}>
           <Pressable
@@ -86,6 +101,7 @@ export default function TutorialScreen() {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
+    backgroundColor: PRE_HOME_BACKGROUND,
   },
   wrapper: {
     flex: 1,
@@ -94,9 +110,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     paddingBottom: 24,
-  },
-  swiper: {
-    flex: 1,
   },
   slide: {
     flex: 1,
@@ -147,6 +160,8 @@ const styles = StyleSheet.create({
     width: 18,
   },
   pagination: {
-    bottom: 24,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginVertical: 16,
   },
 });

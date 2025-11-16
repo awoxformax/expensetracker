@@ -1,82 +1,265 @@
-import React, { useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, Alert, StyleSheet } from "react-native";
-import * as LocalAuthentication from "expo-local-authentication";
-import { setItem, getItem } from "@/src/lib/storage";
+﻿import React, { useCallback, useEffect, useState } from "react";
+import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { Stack } from "expo-router";
+import * as LocalAuthentication from "expo-local-authentication";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useTheme } from "@/src/theme/ThemeProvider";
+import { PIN_KEY, BIOMETRIC_KEY } from "@/src/constants/security";
+import { getItem, setItem } from "@/src/lib/storage";
+import { useLang } from "@/src/context/LangContext";
 
-export default function Settings() {
-  const [pin, setPin] = useState("");
+export default function SecuritySettingsScreen() {
+  const { colors } = useTheme();
+  const { t } = useLang();
+  const insets = useSafeAreaInsets();
+  const [storedPin, setStoredPin] = useState<string | null>(null);
+  const [currentPin, setCurrentPin] = useState("");
+  const [newPin, setNewPin] = useState("");
+  const [confirmPin, setConfirmPin] = useState("");
+  const [biometricEnabled, setBiometricEnabled] = useState(false);
+  const [biometricSupported, setBiometricSupported] = useState(false);
+  const [supportedTypes, setSupportedTypes] = useState<LocalAuthentication.AuthenticationType[]>([]);
+  const [savingPin, setSavingPin] = useState(false);
+  const [bioLoading, setBioLoading] = useState(false);
 
-  async function savePin() {
-    if (pin.length < 4) return Alert.alert("Xəta", "PIN ən azı 4 rəqəm olmalıdır.");
-    await setItem("userPIN", pin);
-    Alert.alert("✅ Uğurlu", "PIN yadda saxlanıldı.");
-  }
+  useEffect(() => {
+    (async () => {
+      const pin = await getItem<string | null>(PIN_KEY, null);
+      setStoredPin(pin);
+      const enabled = await getItem<boolean>(BIOMETRIC_KEY, false);
+      setBiometricEnabled(enabled);
 
-  async function enableBiometric() {
-    const compatible = await LocalAuthentication.hasHardwareAsync();
-    if (!compatible) return Alert.alert("Xəta", "Bu cihaz biometrik identifikasiyanı dəstəkləmir.");
-    const enrolled = await LocalAuthentication.isEnrolledAsync();
-    if (!enrolled) return Alert.alert("Xəbərdarlıq", "Barmaq izi əlavə edilməyib.");
-    const result = await LocalAuthentication.authenticateAsync({
-      promptMessage: "Barmaq izi ilə təsdiqlə",
-    });
-    result.success
-      ? Alert.alert("✅ Aktiv edildi", "Biometrik giriş uğurla aktiv edildi.")
-      : Alert.alert("❌ Uğursuz", "Təsdiqləmə alınmadı.");
-  }
+      const hasHardware = await LocalAuthentication.hasHardwareAsync();
+      if (!hasHardware) return;
+      const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
+      if (!types.length) return;
+      setBiometricSupported(true);
+      setSupportedTypes(types);
+    })();
+  }, []);
+
+  const labelForBiometric = useCallback(
+    (type: number) => {
+      switch (type) {
+        case LocalAuthentication.AuthenticationType.FINGERPRINT:
+          return t("security_bioFingerprint");
+        case LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION:
+          return t("security_bioFaceId");
+        default:
+          return t("security_bioGeneric");
+      }
+    },
+    [t]
+  );
+
+  const handleSavePin = async () => {
+    if (savingPin) return;
+    if (storedPin && currentPin !== storedPin) {
+      Alert.alert(t("security_errorTitle"), t("security_errorCurrent"));
+      return;
+    }
+    if (newPin.length < 4) {
+      Alert.alert(t("security_errorTitle"), t("security_errorLength"));
+      return;
+    }
+    if (newPin !== confirmPin) {
+      Alert.alert(t("security_errorTitle"), t("security_errorMismatch"));
+      return;
+    }
+    setSavingPin(true);
+    try {
+      await setItem(PIN_KEY, newPin);
+      setStoredPin(newPin);
+      setCurrentPin("");
+      setNewPin("");
+      setConfirmPin("");
+      Alert.alert(t("security_successTitle"), t("security_pinUpdated"));
+    } finally {
+      setSavingPin(false);
+    }
+  };
+
+  const validateCurrentPin = () => {
+    if (!storedPin) {
+      Alert.alert(t("security_pinRequiredTitle"), t("security_pinRequiredMessage"));
+      return false;
+    }
+    if (currentPin !== storedPin) {
+      Alert.alert(t("security_pinWrongTitle"), t("security_pinWrongMessage"));
+      return false;
+    }
+    return true;
+  };
+
+  const toggleBiometric = async () => {
+    if (!biometricSupported) {
+      Alert.alert(t("security_bioUnsupportedTitle"), t("security_bioUnsupportedMessage"));
+      return;
+    }
+    if (!validateCurrentPin()) return;
+    if (bioLoading) return;
+    setBioLoading(true);
+    try {
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage: t("security_bioPrompt"),
+        fallbackLabel: t("security_bioFallback"),
+      });
+      if (!result.success) {
+        Alert.alert(t("security_bioFailedTitle"), t("security_bioFailedMessage"));
+        return;
+      }
+      const next = !biometricEnabled;
+      await setItem(BIOMETRIC_KEY, next);
+      setBiometricEnabled(next);
+      Alert.alert(t("security_bioReadyTitle"), next ? t("security_bioEnabled") : t("security_bioDisabled"));
+    } finally {
+      setBioLoading(false);
+    }
+  };
+
+  const supportedNames = supportedTypes.map(labelForBiometric).join(", ");
 
   return (
-    <View style={styles.container}>
-      <Stack.Screen options={{ title: "PIN və biometrika" }} />
-      <View style={styles.inner}>
-        <Text style={styles.label}>Yeni PIN</Text>
+    <View
+      style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top + 16 }]}
+    >
+      <Stack.Screen options={{ title: t("security_title") }} />
+      <View style={[styles.card, { backgroundColor: colors.card }]}>
+        <Text style={[styles.cardTitle, { color: colors.text }]}>{t("security_pinManagement")}</Text>
+        {storedPin && (
+          <>
+            <Text style={[styles.label, { color: colors.subtext }]}>{t("security_currentPin")}</Text>
+            <TextInput
+              style={[styles.input, { color: colors.text, borderColor: colors.border }]}
+              value={currentPin}
+              onChangeText={setCurrentPin}
+              placeholder="****"
+              placeholderTextColor={colors.subtext}
+              keyboardType="number-pad"
+              secureTextEntry
+              maxLength={6}
+            />
+          </>
+        )}
+        <Text style={[styles.label, { color: colors.subtext }]}>{t("security_newPin")}</Text>
         <TextInput
-          value={pin}
-          onChangeText={setPin}
+          style={[styles.input, { color: colors.text, borderColor: colors.border }]}
+          value={newPin}
+          onChangeText={setNewPin}
+          placeholder={t("security_pinPlaceholder")}
+          placeholderTextColor={colors.subtext}
+          keyboardType="number-pad"
           secureTextEntry
-          keyboardType="numeric"
           maxLength={6}
-          style={styles.input}
         />
-        <TouchableOpacity style={styles.saveBtn} onPress={savePin}>
-          <Text style={styles.saveText}>Yadda saxla</Text>
+        <Text style={[styles.label, { color: colors.subtext }]}>{t("security_confirmPin")}</Text>
+        <TextInput
+          style={[styles.input, { color: colors.text, borderColor: colors.border }]}
+          value={confirmPin}
+          onChangeText={setConfirmPin}
+          placeholder={t("security_pinConfirmPlaceholder")}
+          placeholderTextColor={colors.subtext}
+          keyboardType="number-pad"
+          secureTextEntry
+          maxLength={6}
+        />
+        <TouchableOpacity
+          style={[styles.saveBtn, { backgroundColor: colors.primary }]}
+          onPress={handleSavePin}
+          activeOpacity={0.9}
+        >
+          <Text style={styles.saveText}>
+            {savingPin ? t("security_savingPin") : t("security_savePin")}
+          </Text>
         </TouchableOpacity>
+      </View>
 
-        <Text style={[styles.label, { marginTop: 20 }]}>Biometrik (barmaq izi)</Text>
-        <TouchableOpacity style={styles.bioBtn} onPress={enableBiometric}>
-          <Text style={styles.bioText}>Aktiv et</Text>
+      <View style={[styles.card, { backgroundColor: colors.card }]}>
+        <Text style={[styles.cardTitle, { color: colors.text }]}>{t("security_biometricsTitle")}</Text>
+        <Text style={[styles.helper, { color: colors.subtext }]}>
+          {biometricSupported
+            ? t("security_biometricsSupported", { types: supportedNames })
+            : t("security_biometricsNotSupported")}
+        </Text>
+        <TouchableOpacity
+          style={[
+            styles.toggleBtn,
+            { backgroundColor: biometricEnabled ? "#059669" : colors.border },
+          ]}
+          onPress={toggleBiometric}
+          disabled={bioLoading}
+          activeOpacity={0.9}
+        >
+          <Text style={[styles.toggleText, { color: biometricEnabled ? "#fff" : colors.text }]}>
+            {bioLoading
+              ? t("security_toggleChecking")
+              : biometricEnabled
+              ? t("security_toggleDisable")
+              : t("security_toggleEnable")}
+          </Text>
         </TouchableOpacity>
+        <Text style={[styles.helper, { color: colors.subtext }]}>{t("security_bioInfo")}</Text>
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F4F6F9", alignItems: "center", justifyContent: "center" },
-  inner: { width: "85%", backgroundColor: "#fff", padding: 20, borderRadius: 16, elevation: 3 },
-  label: { color: "#0F172A", marginBottom: 6, fontWeight: "700" },
+  container: {
+    flex: 1,
+    paddingHorizontal: 20,
+    gap: 20,
+  },
+  card: {
+    borderRadius: 20,
+    padding: 20,
+    shadowColor: "rgba(0,0,0,0.08)",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    marginBottom: 12,
+  },
+  label: {
+    fontSize: 13,
+    marginTop: 14,
+    marginBottom: 6,
+  },
   input: {
-    backgroundColor: "#F9FAFB",
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    borderRadius: 10,
-    padding: 12,
-    fontSize: 15,
+    borderWidth: 1.5,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 16,
   },
   saveBtn: {
-    backgroundColor: "#2563EB",
+    marginTop: 18,
     paddingVertical: 14,
-    borderRadius: 10,
-    alignItems: "center",
-    marginTop: 6,
-  },
-  saveText: { color: "#fff", fontWeight: "700", fontSize: 15 },
-  bioBtn: {
-    backgroundColor: "#E5E7EB",
-    paddingVertical: 12,
-    borderRadius: 10,
+    borderRadius: 12,
     alignItems: "center",
   },
-  bioText: { color: "#111827", fontWeight: "700" },
+  saveText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 15,
+  },
+  helper: {
+    marginTop: 10,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  toggleBtn: {
+    marginTop: 12,
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+  toggleText: {
+    fontWeight: "700",
+    fontSize: 15,
+  },
 });
