@@ -1,3 +1,4 @@
+import axios, { AxiosResponse } from "axios";
 import { http } from "./http";
 
 type AuthResponse = {
@@ -5,6 +6,12 @@ type AuthResponse = {
   token?: string;
   refreshToken?: string;
   user?: { id: string; email: string };
+  error?: string;
+};
+
+type VerificationResponse = {
+  ok: boolean;
+  message?: string;
   error?: string;
 };
 
@@ -43,22 +50,60 @@ export type UserProfileUpdatePayload = {
   categories?: RemoteCategoryPayload[];
 };
 
-export async function apiSignup(email: string, password: string): Promise<AuthResponse> {
-  const res = await http.post<AuthResponse>(
-    "/auth/signup",
-    { email, password },
-    { skipAuthRefresh: true }
-  );
-  return res.data;
+async function resolveApiResponse<T>(
+  request: Promise<AxiosResponse<T>>
+): Promise<T> {
+  try {
+    const res = await request;
+    return res.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      const data = error.response?.data;
+      if (data && typeof data === "object") {
+        return data as T;
+      }
+    }
+    throw error;
+  }
 }
 
-export async function apiLogin(email: string, password: string): Promise<AuthResponse> {
-  const res = await http.post<AuthResponse>(
-    "/auth/login",
-    { email, password },
-    { skipAuthRefresh: true }
+export async function apiRequestSignupVerification(
+  email: string
+): Promise<VerificationResponse> {
+  return resolveApiResponse(
+    http.post<VerificationResponse>(
+      "/auth/request-verification",
+      { email },
+      { skipAuthRefresh: true }
+    )
   );
-  return res.data;
+}
+
+export async function apiSignup(
+  email: string,
+  password: string,
+  verificationCode: string
+): Promise<AuthResponse> {
+  return resolveApiResponse(
+    http.post<AuthResponse>(
+      "/auth/signup",
+      { email, password, verificationCode },
+      { skipAuthRefresh: true }
+    )
+  );
+}
+
+export async function apiLogin(
+  email: string,
+  password: string
+): Promise<AuthResponse> {
+  return resolveApiResponse(
+    http.post<AuthResponse>(
+      "/auth/login",
+      { email, password },
+      { skipAuthRefresh: true }
+    )
+  );
 }
 
 export async function apiGetProfile(): Promise<UserProfileResponse> {

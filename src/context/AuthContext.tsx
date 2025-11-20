@@ -21,7 +21,11 @@ type AuthContextType = {
   isAuthenticated: boolean;
   token: string | null;
   login: (email: string, password: string) => Promise<boolean>;
-  signup: (email: string, password: string) => Promise<boolean>;
+  signup: (
+    email: string,
+    password: string,
+    verificationCode: string
+  ) => Promise<boolean>;
   logout: () => void;
 };
 
@@ -57,43 +61,46 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const login = useCallback(async (email: string, password: string) => {
     if (!email || !password) {
-      Alert.alert("Xəta", "Email və şifrə lazımdır");
+      Alert.alert("Xeta", "Email ve sifre lazimdir");
       return false;
     }
     try {
       const res = await apiLogin(email, password);
       if (!res.ok || !res.token) {
-        Alert.alert("Xəta", res.error || "Giriş mümkün olmadı");
+        Alert.alert("Xeta", res.error || "Giris mumkun olmadi");
         return false;
       }
       await persistAuthTokens(res.token, res.refreshToken ?? null);
       setToken(res.token);
       return true;
     } catch (error) {
-      Alert.alert("Xəta", "Serverə qoşulmaq mümkün olmadı");
+      Alert.alert("Xeta", "Servere qosulmaq mumkun olmadi");
       return false;
     }
   }, []);
 
-  const signup = useCallback(async (email: string, password: string) => {
-    if (!email || !password) {
-      Alert.alert("Xəta", "Email və şifrə lazımdır");
-      return false;
-    }
-    try {
-      const res = await apiSignup(email, password);
-      if (!res.ok || !res.token) {
-        Alert.alert("Xəta", res.error || "Qeydiyyat mümkün olmadı");
+  const signup = useCallback(
+    async (email: string, password: string, verificationCode: string) => {
+      if (!email || !password || !verificationCode) {
+        Alert.alert("Xeta", "Email, sifre ve tesdiq kodu lazimdir");
         return false;
       }
-      await persistAuthTokens(res.token, res.refreshToken ?? null);
-      setToken(res.token);
-      return true;
-    } catch (error) {
-      Alert.alert("Xəta", "Serverə qoşulmaq mümkün olmadı");
-      return false;
-    }
-  }, []);
+      try {
+        const res = await apiSignup(email, password, verificationCode);
+        if (!res.ok || !res.token) {
+          Alert.alert("Xeta", res.error || "Qeydiyyat mumkun olmadi");
+          return false;
+        }
+        await persistAuthTokens(res.token, res.refreshToken ?? null);
+        setToken(res.token);
+        return true;
+      } catch (error) {
+        Alert.alert("Xeta", "Servere qosulmaq mumkun olmadi");
+        return false;
+      }
+    },
+    []
+  );
 
   const logout = useCallback(() => {
     persistAuthTokens(null, null);

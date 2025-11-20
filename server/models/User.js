@@ -9,6 +9,7 @@ const userSchema = new Schema(
       trim: true,
       lowercase: true,
     },
+    emailVerified: { type: Boolean, default: true },
     passwordHash: { type: String, required: true },
     refreshTokenHash: { type: String },
     refreshTokenExpiresAt: { type: Date },

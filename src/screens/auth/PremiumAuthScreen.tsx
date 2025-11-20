@@ -25,6 +25,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useOnboarding } from "../../context/Onboarding";
 import { useUser } from "../../context/UserContext";
 import { ONBOARDING_DONE_KEY } from "../../constants/storage";
+import { apiRequestSignupVerification } from "../../lib/api";
 
 type PremiumAuthScreenProps = {
   mode: "login" | "signup";
@@ -51,6 +52,9 @@ export default function PremiumAuthScreen({ mode }: PremiumAuthScreenProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [verificationStage, setVerificationStage] = useState<"idle" | "code">("idle");
+  const [verificationCode, setVerificationCode] = useState("");
+  const [lockedEmail, setLockedEmail] = useState<string | null>(null);
   const { width, height } = useWindowDimensions();
   const isTablet = Math.min(width, height) >= 768;
 
@@ -80,13 +84,38 @@ export default function PremiumAuthScreen({ mode }: PremiumAuthScreenProps) {
     ]).start();
   }, [screenOpacity, cardTranslate, logoScale]);
 
+  useEffect(() => {
+    if (mode !== "signup") return;
+    if (verificationStage !== "code" || !lockedEmail) return;
+    const normalized = email.trim().toLowerCase();
+    if (normalized !== lockedEmail) {
+      setVerificationStage("idle");
+      setVerificationCode("");
+      setLockedEmail(null);
+    }
+  }, [email, lockedEmail, mode, verificationStage]);
+
+  useEffect(() => {
+    if (mode === "signup") return;
+    setVerificationStage("idle");
+    setVerificationCode("");
+    setLockedEmail(null);
+  }, [mode]);
+
   const title = mode === "login" ? "Welcome Back" : "Create Account";
   const subtitle =
     mode === "login"
       ? "Securely sign in to track every AZN with confidence."
       : "Open your expense vault and stay ahead of every transaction.";
 
-  const actionLabel = mode === "login" ? "Sign In" : "Register";
+  const verificationStepActive =
+    mode === "signup" && verificationStage === "code";
+  const actionLabel =
+    mode === "login"
+      ? "Sign In"
+      : verificationStepActive
+      ? "Verify & Finish"
+      : "Send Code";
   const secondaryLabel = mode === "login" ? "Switch to Register" : "Switch to Login";
   const secondaryRoute = mode === "login" ? "/auth/signup" : "/auth/login";
 
@@ -113,10 +142,11 @@ export default function PremiumAuthScreen({ mode }: PremiumAuthScreenProps) {
     if (submitting) return;
     setSubmitting(true);
     const trimmedEmail = email.trim();
+    const normalizedEmail = trimmedEmail.toLowerCase();
     const trimmedName = fullName.trim();
     const emailValid = /\S+@\S+\.\S+/.test(trimmedEmail);
     if (!emailValid) {
-      Alert.alert("Xəta", "Zəhmət olmasa düzgün email ünvanı daxil et.");
+      Alert.alert("Xeta", "Duzgun email unvani daxil et");
       setSubmitting(false);
       return;
     }
@@ -124,7 +154,39 @@ export default function PremiumAuthScreen({ mode }: PremiumAuthScreenProps) {
     if (mode === "login") {
       success = await login(trimmedEmail, password);
     } else {
-      success = await signup(trimmedEmail, password);
+      if (!password) {
+        Alert.alert("Xeta", "Sifre lazimdir");
+        setSubmitting(false);
+        return;
+      }
+      if (verificationStage === "idle") {
+        try {
+          const response = await apiRequestSignupVerification(trimmedEmail);
+          if (!response.ok) {
+            Alert.alert("Xeta", response.error || "Kod gondermek olmadi");
+          } else {
+            setVerificationStage("code");
+            setVerificationCode("");
+            setLockedEmail(normalizedEmail);
+            Alert.alert(
+              "Kod gonderildi",
+              response.message || "Email unvanina 6 reqemli kod gonderdik."
+            );
+          }
+        } catch {
+          Alert.alert("Xeta", "Servere qosulmaq mumkun olmadi");
+        } finally {
+          setSubmitting(false);
+        }
+        return;
+      }
+      const trimmedCode = verificationCode.trim();
+      if (trimmedCode.length !== 6) {
+        Alert.alert("Xeta", "6 reqemli tesdiq kodunu daxil et");
+        setSubmitting(false);
+        return;
+      }
+      success = await signup(trimmedEmail, password, trimmedCode);
       if (success && trimmedName) {
         const segments = trimmedName.split(" ");
         const first = segments.shift() ?? "";
@@ -138,9 +200,20 @@ export default function PremiumAuthScreen({ mode }: PremiumAuthScreenProps) {
       router.replace("/onboarding/tutorial");
     }
     setSubmitting(false);
-  }, [submitting, mode, email, password, fullName, login, signup, resetOnboarding, router, setName]);
-
-  const renderSocialButton = (icon: IconName, label: string, onPress: () => void) => (
+  }, [
+    submitting,
+    mode,
+    email,
+    password,
+    fullName,
+    verificationStage,
+    verificationCode,
+    login,
+    signup,
+    resetOnboarding,
+    router,
+    setName,
+  ]);  const renderSocialButton = (icon: IconName, label: string, onPress: () => void) => (
     <Pressable
       key={label}
       onPress={onPress}
@@ -298,6 +371,42 @@ export default function PremiumAuthScreen({ mode }: PremiumAuthScreenProps) {
                     </View>
                   </View>
 
+                  {mode === "signup" && verificationStage === "code" && (
+                    <View style={styles.fieldBlock}>
+                      <Text style={[styles.label, { color: colors.subtext, fontFamily: fonts.body }]}>
+                        Verification Code
+                      </Text>
+                      <View
+                        style={[
+                          styles.inputWrapper,
+                          { backgroundColor: inputBackground, borderColor: inputBorder, shadowColor },
+                        ]}
+                      >
+                        <Ionicons name="keypad-outline" size={20} color={colors.subtext} />
+                        <TextInput
+                          value={verificationCode}
+                          onChangeText={setVerificationCode}
+                          placeholder="123456"
+                          placeholderTextColor={colors.subtext}
+                          style={[styles.input, { color: colors.text, fontFamily: fonts.body, letterSpacing: 4 }]}
+                          keyboardType="number-pad"
+                          maxLength={6}
+                          returnKeyType="done"
+                        />
+                      </View>
+                      <Text
+                        style={[
+                          styles.helperText,
+                          { color: colors.subtext, fontFamily: fonts.body },
+                        ]}
+                      >
+                        {lockedEmail
+                          ? `Kod ${lockedEmail} unvanina gonderildi`
+                          : "Emailine gelen 6 reqemli kodu daxil et"}
+                      </Text>
+                    </View>
+                  )}
+
                   <TouchableOpacity
                     activeOpacity={0.9}
                     onPress={handleSubmit}
@@ -413,6 +522,10 @@ const styles = StyleSheet.create({
   fieldBlock: {
     gap: 8,
   },
+  helperText: {
+    fontSize: 12,
+    marginTop: 4,
+  },
   label: {
     fontSize: 13,
     letterSpacing: 0.2,
@@ -494,3 +607,4 @@ const styles = StyleSheet.create({
     textDecorationLine: "underline",
   },
 });
+
